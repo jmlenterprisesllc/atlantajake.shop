@@ -204,10 +204,8 @@
   @keyframes up{to{opacity:1;transform:translateY(0)}}
 
   .corner-mail{
-    position:fixed;
-    right:clamp(.9rem,2.5vw,1.6rem);
-    bottom:clamp(.9rem,2.5vw,1.4rem);
-    z-index:5;
+    display:block;
+    margin-top:.2rem;
     font-family:'Space Mono',monospace;
     font-size:.55rem;
     letter-spacing:.14em;
@@ -219,8 +217,16 @@
   .corner-mail:hover,.corner-mail:focus-visible{color:var(--ink);border-bottom-color:var(--ink)}
   .corner-mail:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
-  @media (max-width:600px){
-    .corner-mail{position:static;display:block;margin-top:1.6rem;font-size:.56rem}
+  /* pin to the corner only when there is genuinely room for it */
+  @media (min-width:900px) and (min-height:720px){
+    body{padding-bottom:3.5rem}
+    .corner-mail{
+      position:fixed;
+      right:1.6rem;
+      bottom:1.3rem;
+      margin-top:0;
+      z-index:5;
+    }
   }
 
   @media (prefers-reduced-motion:reduce){
