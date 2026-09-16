@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atlanta Vintage Clothing Pop-Ups | AtlantaJake Gallery</title>
+  <meta name="description" content="See photos from AtlantaJake vintage clothing pop-ups across Atlanta, GA, featuring vintage menswear, Japanese designer, archive streetwear, and pre-owned luxury.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <link rel="canonical" href="https://atlantajake.com/gallery/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AtlantaJake">
+  <meta property="og:url" content="https://atlantajake.com/gallery/">
+  <meta property="og:title" content="Atlanta Vintage Clothing Pop-Ups | AtlantaJake">
+  <meta property="og:description" content="Photos from AtlantaJake pop-up markets featuring vintage menswear, Japanese designer, archive streetwear, and pre-owned luxury.">
+  <meta property="og:image" content="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-popup-shop.jpg">
+  <meta property="og:image:alt" content="AtlantaJake vintage clothing pop-up in Atlanta, Georgia">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@ATL_JAKE">
+  <meta name="twitter:title" content="Atlanta Vintage Clothing Pop-Ups | AtlantaJake">
+  <meta name="twitter:description" content="Scenes from AtlantaJake vintage and designer clothing pop-ups around Atlanta.">
+  <meta name="twitter:image" content="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-popup-shop.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=Karla:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#06060A;--surface:#0E0E16;--gold:#D8B8EE;--gold-border:rgba(216,184,238,0.30);--text:#F0EDE8;--muted:#A5A19C;--faint:#5C595F;--border:rgba(255,255,255,0.08);}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'Karla',sans-serif;min-height:100vh;}
+    nav{position:fixed;top:0;left:0;right:0;z-index:50;background:rgba(6,6,10,0.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:18px 48px;display:flex;justify-content:space-between;align-items:center;}
+    .nav-logo{font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;letter-spacing:4px;text-transform:uppercase;color:var(--text);text-decoration:none;}
+    .nav-logo span{color:var(--gold);margin:0 5px;}
+    .nav-back{font-size:11px;letter-spacing:2px;color:var(--muted);text-decoration:none;text-transform:uppercase;transition:color 0.3s;}
+    .nav-back:hover{color:var(--gold);}
+    .page-header{padding:120px 48px 48px;text-align:center;border-bottom:1px solid var(--border);}
+    .page-eyebrow{font-size:9px;letter-spacing:5px;color:var(--gold);text-transform:uppercase;margin-bottom:16px;}
+    .page-title{font-family:'Cormorant Garamond',serif;font-size:48px;font-weight:300;color:var(--text);line-height:1;margin-bottom:12px;}
+    .page-sub{font-size:12px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+    .page-intro{max-width:720px;margin:22px auto 0;font-size:15px;line-height:1.75;color:#c8c4c0;}
+    .header-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:24px;}
+    .popup-link{display:inline-block;border:1px solid var(--gold-border);color:var(--gold);text-decoration:none;font-size:10px;letter-spacing:2px;text-transform:uppercase;padding:11px 18px;transition:all .3s;}
+    .popup-link:hover{background:var(--gold);color:var(--bg);}
+    .gallery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:6px 6px 48px;}
+    .gallery-item{position:relative;aspect-ratio:3/4;overflow:hidden;cursor:pointer;}
+    .gallery-item img{width:100%;height:100%;object-fit:cover;transition:transform 0.5s ease;}
+    .gallery-item:hover img{transform:scale(1.04);}
+    .gallery-item .overlay{position:absolute;inset:0;background:rgba(6,6,10,0);display:flex;align-items:flex-end;padding:16px;transition:background 0.3s;}
+    .gallery-item:hover .overlay{background:rgba(6,6,10,0.45);}
+    .gallery-item .overlay span{font-size:11px;color:#fff;letter-spacing:1px;opacity:0;transition:opacity 0.3s;}
+    .gallery-item:hover .overlay span{opacity:1;}
+    .lightbox{display:none;position:fixed;inset:0;z-index:200;background:rgba(6,6,10,0.96);align-items:center;justify-content:center;flex-direction:column;}
+    .lightbox.active{display:flex;}
+    .lb-img{max-width:90vw;max-height:80vh;object-fit:contain;border:1px solid var(--border);}
+    .lb-cap{font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-top:16px;text-align:center;}
+    .lb-count{font-size:10px;color:var(--faint);margin-top:8px;letter-spacing:1px;}
+    .lb-close{position:fixed;top:24px;right:32px;font-size:24px;color:var(--muted);cursor:pointer;background:none;border:none;line-height:1;transition:color 0.3s;}
+    .lb-close:hover{color:var(--gold);}
+    .lb-prev,.lb-next{position:fixed;top:50%;transform:translateY(-50%);background:none;border:1px solid var(--border);color:var(--muted);font-size:20px;padding:12px 16px;cursor:pointer;transition:all 0.3s;}
+    .lb-prev{left:24px;} .lb-next{right:24px;}
+    .lb-prev:hover,.lb-next:hover{border-color:var(--gold-border);color:var(--gold);}
+    .footer{text-align:center;padding:32px;border-top:1px solid var(--border);font-size:10px;color:var(--faint);}
+    .back-btn{display:inline-block;margin-bottom:16px;border:1px solid var(--gold-border);color:var(--gold);text-decoration:none;font-size:10px;letter-spacing:3px;text-transform:uppercase;padding:12px 28px;transition:all 0.3s;}
+    .back-btn:hover{background:var(--gold);color:var(--bg);}
+    @media(max-width:768px){nav{padding:16px 20px;}.page-header{padding:100px 20px 36px;}.gallery-grid{grid-template-columns:repeat(2,1fr);gap:4px;padding:4px 4px 36px;}.lb-prev{left:8px;}.lb-next{right:8px;}}
+  </style>
+<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-JTGDS210BL"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-JTGDS210BL');
+</script>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ClothingStore",
+    "name": "AtlantaJake",
+    "url": "https://atlantajake.com/",
+    "image": "https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-popup-shop.jpg",
+    "description": "Atlanta-based vintage menswear, Japanese designer, archive streetwear, and pre-owned luxury seller.",
+    "areaServed": {"@type": "City", "name": "Atlanta"},
+    "sameAs": [
+      "https://www.instagram.com/atl_jake/",
+      "https://www.depop.com/atlantajake/",
+      "https://www.grailed.com/AtlantaJake",
+      "https://www.ebay.com/usr/jmlatljake"
+    ]
+  }
+  </script>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">AtlantaJake <span>·</span> Gallery</a>
+  <a href="/" class="nav-back">← Back to Shop</a>
+</nav>
+<div class="page-header">
+  <div class="page-eyebrow">Atlanta Vintage Clothing Pop-Ups</div>
+  <h1 class="page-title">AtlantaJake Pop-Up Gallery</h1>
+  <p class="page-sub">Vintage menswear · Japanese designer · Archive streetwear</p>
+  <p class="page-intro">AtlantaJake brings handpicked vintage menswear, Japanese designer, archive streetwear, and pre-owned luxury to pop-up markets across Atlanta. Browse moments from recent local events, then follow <strong>@ATL_JAKE</strong> for upcoming dates and locations.</p>
+  <div class="header-actions">
+    <a class="popup-link" href="https://www.instagram.com/atl_jake/" target="_blank" rel="noopener">Upcoming Pop-Ups on Instagram</a>
+    <a class="popup-link" href="https://www.depop.com/atlantajake/" target="_blank" rel="noopener">Shop Online</a>
+  </div>
+</div>
+<div class="gallery-grid">
+    <div class="gallery-item" onclick="openLightbox(0)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-popup-shop.jpg" alt="AtlantaJake vintage clothing pop-up in Atlanta, Georgia" loading="eager" fetchpriority="high">
+      <div class="overlay"><span>AtlantaJake popup — Atlanta, GA</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(1)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-clothing-popup-market.jpg" alt="Shoppers at AtlantaJake popup" loading="lazy">
+      <div class="overlay"><span>Shoppers at AtlantaJake popup</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(2)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-vintage-menswear-designer-resale-atlantajake.jpg" alt="Customers with bags and vintage finds" loading="lazy">
+      <div class="overlay"><span>Customers with bags and vintage finds</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(3)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-streetwear-popup-vintage-burberry-atlantajake.jpg" alt="Atlanta vintage Burberry popup" loading="lazy">
+      <div class="overlay"><span>Atlanta vintage Burberry popup</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(4)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-streetwear-popup-shop-atlantajake-designer-bag.jpg" alt="Customers with AtlantaJake bags — Westside Paper" loading="lazy">
+      <div class="overlay"><span>Customers with AtlantaJake bags — Westside Paper</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(5)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-designer-popup.jpg" alt="Customer Flicked up at AtlantaJake Booth" loading="lazy">
+      <div class="overlay"><span>Customer Flicked up at AtlantaJake Booth</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(6)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-vintage-menswear-night-market-atlantajake.jpg" alt="Night market — busy booth" loading="lazy">
+      <div class="overlay"><span>Night market — busy booth</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(7)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-designer-resale-louis-vuitton-atlantajake-popup.jpg" alt="Booth setup — Furry Friends Welcome!" loading="lazy">
+      <div class="overlay"><span>Booth setup — Furry Friends Welcome!</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(8)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-designer-bag.jpg" alt="AtlantaJake vintage streetwear bag — Atlanta" loading="lazy">
+      <div class="overlay"><span>AtlantaJake vintage streetwear bag — Atlanta</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(9)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-vintage-popup-shop-designer-bags-atlantajake.jpg" alt="AtlantaJake popup — designer bags Atlanta" loading="lazy">
+      <div class="overlay"><span>AtlantaJake popup — designer bags Atlanta</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(10)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-vintage-menswear-thrift-shop-atlantajake.jpg" alt="AtlantaJake vintage menswear rack — Atlanta" loading="lazy">
+      <div class="overlay"><span>AtlantaJake vintage menswear rack — Atlanta</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(11)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-streetwear-vintage-thrift-popup-atlantajake.jpg" alt="Atlanta streetwear vintage popup" loading="lazy">
+      <div class="overlay"><span>Atlanta streetwear vintage popup</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(12)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-outdoor-popup-market.jpg" alt="AtlantaJake popup — open air market" loading="lazy">
+      <div class="overlay"><span>AtlantaJake popup — open air market</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(13)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-vintage-clothing-popup-market-atlantajake.jpg" alt="Evening popup — Atlanta courtyard" loading="lazy">
+      <div class="overlay"><span>Evening popup — Atlanta courtyard</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(14)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-atlanta-streetwear-popup-brewdog.jpg" alt="AtlantaJake booth setup — Brewdog ATL" loading="lazy">
+      <div class="overlay"><span>AtlantaJake booth setup — Brewdog ATL</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(15)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-vintage-streetwear-popup-bags-atlantajake.jpg" alt="Shoppers at AtlantaJake popup Atlanta" loading="lazy">
+      <div class="overlay"><span>Shoppers at AtlantaJake popup Atlanta</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(16)">
+      <img src="https://jmlenterprisesllc.com/files/atlanta-pre-owned-designer-resale-popup-atlantajake.jpg" alt="Pre-owned designer resale — AtlantaJake" loading="lazy">
+      <div class="overlay"><span>Pre-owned designer resale — AtlantaJake</span></div>
+    </div>
+    <div class="gallery-item" onclick="openLightbox(17)">
+      <img src="https://jmlenterprisesllc.com/files/atlantajake-westside-paper-atlanta-vintage-popup.jpg" alt="Customers with AtlantaJake bags — Westside Paper" loading="lazy">
+      <div class="overlay"><span>Customers with AtlantaJake bags — Westside Paper</span></div>
+    </div>
+</div>
+<div class="footer">
+  <a href="https://www.instagram.com/atl_jake/" target="_blank" rel="noopener" class="back-btn">Follow for Upcoming Pop-Ups</a>
+  <p>© 2026 AtlantaJake · A JML Enterprises LLC brand · Atlanta, GA</p>
+</div>
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <button class="lb-prev" onclick="changeSlide(-1)">&#8249;</button>
+  <img class="lb-img" id="lb-img" src="" alt="">
+  <div class="lb-cap" id="lb-cap"></div>
+  <div class="lb-count" id="lb-count"></div>
+  <button class="lb-next" onclick="changeSlide(1)">&#8250;</button>
+</div>
+<script>
+const slides = [
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-popup-shop.jpg", cap: "AtlantaJake popup — Atlanta, GA" },
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-clothing-popup-market.jpg", cap: "Shoppers at AtlantaJake popup" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-vintage-menswear-designer-resale-atlantajake.jpg", cap: "Customers with bags and vintage finds" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-streetwear-popup-vintage-burberry-atlantajake.jpg", cap: "Atlanta vintage Burberry popup" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-streetwear-popup-shop-atlantajake-designer-bag.jpg", cap: "Customers with AtlantaJake bags — Westside Paper" },
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-designer-popup.jpg", cap: "Customer Flicked up at AtlantaJake Booth" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-vintage-menswear-night-market-atlantajake.jpg", cap: "Night market — busy booth" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-designer-resale-louis-vuitton-atlantajake-popup.jpg", cap: "Booth setup — Furry Friends Welcome!" },
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-streetwear-designer-bag.jpg", cap: "AtlantaJake vintage streetwear bag — Atlanta" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-vintage-popup-shop-designer-bags-atlantajake.jpg", cap: "AtlantaJake popup — designer bags Atlanta" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-vintage-menswear-thrift-shop-atlantajake.jpg", cap: "AtlantaJake vintage menswear rack — Atlanta" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-streetwear-vintage-thrift-popup-atlantajake.jpg", cap: "Atlanta streetwear vintage popup" },
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-atlanta-vintage-outdoor-popup-market.jpg", cap: "AtlantaJake popup — open air market" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-vintage-clothing-popup-market-atlantajake.jpg", cap: "Evening popup — Atlanta courtyard" },
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-atlanta-streetwear-popup-brewdog.jpg", cap: "AtlantaJake booth setup — Brewdog ATL" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-vintage-streetwear-popup-bags-atlantajake.jpg", cap: "Shoppers at AtlantaJake popup Atlanta" },
+  { src: "https://jmlenterprisesllc.com/files/atlanta-pre-owned-designer-resale-popup-atlantajake.jpg", cap: "Pre-owned designer resale — AtlantaJake" },
+  { src: "https://jmlenterprisesllc.com/files/atlantajake-westside-paper-atlanta-vintage-popup.jpg", cap: "Customers with AtlantaJake bags — Westside Paper" },
+];
+let current=0;
+function openLightbox(i){current=i;updateLightbox();document.getElementById('lightbox').classList.add('active');document.body.style.overflow='hidden';}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('active');document.body.style.overflow='';}
+function changeSlide(dir){current=(current+dir+slides.length)%slides.length;updateLightbox();}
+function updateLightbox(){document.getElementById('lb-img').src=slides[current].src;document.getElementById('lb-img').alt=slides[current].cap;document.getElementById('lb-cap').textContent=slides[current].cap;document.getElementById('lb-count').textContent=(current+1)+' / '+slides.length;}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox();if(e.key==='ArrowLeft')changeSlide(-1);if(e.key==='ArrowRight')changeSlide(1);});
+</script>
+</body>
+</html>
