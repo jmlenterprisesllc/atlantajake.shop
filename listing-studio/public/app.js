@@ -52,7 +52,7 @@ $('export').onclick=async()=>{
  try{
  const chosen=[...selected].map(s=>items.get(s)).filter(i=>i?.approved);
  if(!chosen.length)throw Error('Check the box beside an approved listing, then click Export approved selection.');
- const csv=exportCSV(chosen,tax);
+ const csv=exportCSV(chosen,tax,location.origin);
  if(exportURL)URL.revokeObjectURL(exportURL);
  exportURL=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
  const link=document.createElement('a');link.href=exportURL;link.download='AtlantaJake_Depop_'+new Date().toISOString().slice(0,10)+'.csv';link.textContent='Download CSV ('+chosen.length+' '+(chosen.length===1?'listing':'listings')+')';link.className='button secondary';
