@@ -27,7 +27,7 @@ A separate, account-ready pilot for the owner's listing workflow. The public sto
    - `npx wrangler secret put OPENAI_MODEL` — use an available model supporting image input and structured Responses output; quality must be calibrated before large batches.
    - Optional: `npx wrangler secret put INVENTORY_CSV_URL` — accessible Google Sheets CSV export URL. Keep the sheet private if using CSV import instead; do not broaden sharing simply to enable refresh.
 7. Run `npx wrangler d1 migrations apply atlantajake-listings --remote`, then `npm run deploy`.
-8. Open the returned HTTPS address. Enter the studio access token. API keys remain on the server. The token is held in page memory only, so reconnect after a reload. Inventory endpoints require the token; image URLs are intentionally public for Depop and image analysis. The UI shell itself is public and contains no inventory.
+8. Open the returned HTTPS address. Sign in with the password stored as ADMIN_TOKEN. API keys remain on the server. The password is checked on the server. A signed, Secure, HttpOnly, SameSite=Strict cookie grants a four-hour session. Dashboard HTML, scripts, taxonomy and inventory require sign-in. Only the login page, stylesheet and deliberately public image URLs are accessible without signing in. Signing out clears the cookie; rotating ADMIN_TOKEN invalidates sessions. Use a password-manager-generated password.
 
 For local testing, use a local `.dev.vars` file (ignored by Git) for secrets, run the D1 migrations with `--local`, then `npm run dev`. Local image URLs cannot be fetched by the hosted OpenAI API: live image analysis requires a reachable HTTPS deployment.
 
@@ -48,6 +48,12 @@ Validate against AJ1028–AJ1032 first: Woody Woodpecker identity, Tultex August
 - Inventory notes and photos are source facts, never final copy or instructions.
 
 Taxonomy is extracted from the provided version 6 template. This pilot is intentionally limited to adult crewneck sizes/categories. Check a fresh Depop template before expanding to footwear, accessories or children's clothing. No measurements are inferred from pixels.
+
+## Drive and your domain
+
+The current pilot still uses R2. Google Drive ingestion and Drive-backed image delivery are planned, not implemented. Upload original SKU folders to one private Drive parent folder. Future access requires Google authorization and a real Depop image-link test.
+
+GitHub Pages cannot enforce this server sign-in wall. Route a studio subdomain or path to the authenticated backend after hosting is configured. Do not deploy public/ alone to Pages as a protected dashboard. No routing or deployment changes have been made.
 
 ## Not enabled yet
 

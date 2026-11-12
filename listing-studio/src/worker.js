@@ -1,12 +1,24 @@
+import {authorised,session,sessionCookie,logoutCookie,loginPage,correctPassword} from './auth.js';
 import {description,validate} from '../public/core.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 const skuOK=s=>/^AJ\d+$/.test(s);
-async function authorised(req,env){if(!env.ADMIN_TOKEN)return false;const supplied=req.headers.get('Authorization')||'';const hash=async s=>new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));const a=await hash(supplied),b=await hash('Bearer '+env.ADMIN_TOKEN);let diff=0;for(let i=0;i<a.length;i++)diff|=a[i]^b[i];return diff===0;}
 export default {async fetch(req,env){
  try{
  const u=new URL(req.url),path=u.pathname;
+ const privateHeaders={'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"};
+ if(!['GET','HEAD'].includes(req.method)&&(req.headers.get('Sec-Fetch-Site')==='cross-site'||req.headers.get('Origin')&&req.headers.get('Origin')!==u.origin))return json({error:'Cross-site request rejected'},403);
+ if(path==='/login'&&req.method==='GET')return new Response(loginPage,{headers:{...privateHeaders,'Content-Type':'text/html;charset=utf-8'}});
+ if(path==='/auth/login'&&req.method==='POST'){
+ if(!env.ADMIN_TOKEN)return new Response('Studio sign-in is not configured yet.',{status:503,headers:privateHeaders});
+ const body=await req.text();if(body.length>4096)return json({error:'Invalid sign-in request'},400);
+ if(!await correctPassword(new URLSearchParams(body).get('password')||'',env.ADMIN_TOKEN))return new Response('Incorrect password. Return to the sign-in page and try again.',{status:401,headers:privateHeaders});
+ return new Response(null,{status:303,headers:{...privateHeaders,Location:'/', 'Set-Cookie':sessionCookie(await session(env.ADMIN_TOKEN))}});
+ }
+ if(path==='/auth/logout'&&req.method==='POST')return new Response(null,{status:303,headers:{...privateHeaders,Location:'/login','Set-Cookie':logoutCookie}});
+ if(path==='/studio.css'&&req.method==='GET')return env.ASSETS.fetch(req);
+
  if(path.startsWith('/photos/')){if(req.method!=='GET'&&req.method!=='HEAD')return json({error:'Method not allowed'},405);const key=path.slice(8);if(!/^AJ\d+\/[a-f0-9]{64}\.jpg$/.test(key))return json({error:'Not found'},404);const o=await env.PHOTOS.get(key);if(!o)return json({error:'Not found'},404);return new Response(req.method==='HEAD'?null:o.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});}
- if(!path.startsWith('/api/')){const r=await env.ASSETS.fetch(req);const h=new Headers(r.headers);h.set('X-Robots-Tag','noindex, nofollow');h.set('Content-Security-Policy',"default-src 'self'; img-src 'self' blob:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");h.set('Referrer-Policy','no-referrer');return new Response(r.body,{status:r.status,headers:h});}
+ if(!path.startsWith('/api/')){if(!await authorised(req,env))return new Response(null,{status:303,headers:{...privateHeaders,Location:'/login'}});const r=await env.ASSETS.fetch(req);const h=new Headers(r.headers);h.set('Cache-Control','no-store');h.set('X-Robots-Tag','noindex, nofollow');h.set('Content-Security-Policy',"default-src 'self'; img-src 'self' blob:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");h.set('Referrer-Policy','no-referrer');return new Response(r.body,{status:r.status,headers:h});}
  if(!await authorised(req,env))return json({error:'Enter your studio access token.'},401);
  if(path==='/api/status')return json({storage:!!env.PHOTOS,database:!!env.DB,analysis:!!env.OPENAI_API_KEY&&!!env.OPENAI_MODEL,inventory:!!env.INVENTORY_CSV_URL});
  if(path==='/api/inventory'){if(!env.INVENTORY_CSV_URL)return json({error:'Inventory connection not configured. Import an inventory CSV instead.'},503);const r=await fetch(env.INVENTORY_CSV_URL);if(!r.ok)return json({error:'Inventory sheet is unavailable. Import its CSV instead.'},502);return new Response(await r.text(),{headers:{'Content-Type':'text/csv','Cache-Control':'no-store'}});}
