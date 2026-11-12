@@ -21,7 +21,14 @@ export default {async fetch(req,env){
  if(path==='/studio.css'&&req.method==='GET')return env.ASSETS.fetch(req);
 
 
- if(dp){if(!['GET','HEAD'].includes(req.method))return json({error:'Method not allowed'},405);return photoResponse(req,env,dp[1],dp[2],dp[3]);}
+ if(dp){
+ if(!['GET','HEAD'].includes(req.method))return json({error:'Method not allowed'},405);
+ const started=Date.now();let response;
+ try{response=await photoResponse(req,env,dp[1],dp[2],dp[3]);}
+ catch{response=json({error:'Photo delivery failed.'},502);}
+ console.info('PHOTO_DELIVERY '+JSON.stringify({sku:dp[1],method:req.method,status:response.status,contentType:response.headers.get('Content-Type'),declaredBytes:response.headers.get('Content-Length'),elapsedMs:Date.now()-started,client:(req.headers.get('User-Agent')||'unknown').slice(0,160)}));
+ return response;
+ }
  if(path.startsWith('/photos/')){if(req.method!=='GET'&&req.method!=='HEAD')return json({error:'Method not allowed'},405);const key=path.slice(8);if(!/^AJ\d+\/[a-f0-9]{64}\.jpg$/.test(key))return json({error:'Not found'},404);if(!env.PHOTOS)return json({error:'Not found'},404);const o=await env.PHOTOS.get(key);if(!o)return json({error:'Not found'},404);return new Response(req.method==='HEAD'?null:o.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});}
  if(!path.startsWith('/api/')){if(!await authorised(req,env))return new Response(null,{status:303,headers:{...privateHeaders,Location:'/login'}});const r=await env.ASSETS.fetch(req);const h=new Headers(r.headers);h.set('Cache-Control','no-store');h.set('X-Robots-Tag','noindex, nofollow');h.set('Content-Security-Policy',"default-src 'self'; img-src 'self' blob:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");h.set('Referrer-Policy','no-referrer');return new Response(r.body,{status:r.status,headers:h});}
  if(!await authorised(req,env))return json({error:'Enter your studio access token.'},401);
