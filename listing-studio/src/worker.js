@@ -6,7 +6,7 @@ const skuOK=s=>/^AJ\d+$/.test(s);
 export default {async fetch(req,env){
  try{
  const u=new URL(req.url),path=u.pathname;
- const privateHeaders={'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"};
+ const privateHeaders={'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow','Referrer-Policy':'same-origin','Content-Security-Policy':"default-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"};
  if(!['GET','HEAD'].includes(req.method)&&(req.headers.get('Sec-Fetch-Site')==='cross-site'||req.headers.get('Origin')&&req.headers.get('Origin')!==u.origin))return json({error:'Cross-site request rejected'},403);
  if(path==='/login'&&req.method==='GET')return new Response(loginPage,{headers:{...privateHeaders,'Content-Type':'text/html;charset=utf-8'}});
  if(path==='/auth/login'&&req.method==='POST'){
