@@ -46,4 +46,21 @@ function review(){const i=items.get(active);if(!i)return;const a=i.analysis;cons
  };$('save').onclick=()=>save(false);$('approve').onclick=()=>save(true);
 }
 $('search').oninput=render;$('selectAll').onchange=e=>{for(const i of visible())e.target.checked?selected.add(i.sku):selected.delete(i.sku);render();};$('selectRange').onclick=()=>{const start=Number($('from').value.replace(/\D/g,'')),end=Number($('to').value.replace(/\D/g,''));if(!start||end<start)return notice('Enter a valid SKU range.');selected.clear();for(const i of items.values()){const n=Number(i.sku.slice(2));if(n>=start&&n<=end)selected.add(i.sku);}render();notice(selected.size+' items selected.');};
-$('export').onclick=async()=>{try{const chosen=[...selected].map(s=>items.get(s)).filter(i=>i?.approved&&i.status!=='exported');const csv=exportCSV(chosen,tax);const link=document.createElement('a'),url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));link.href=url;link.download='AtlantaJake_Depop_'+new Date().toISOString().slice(0,10)+'.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);for(const i of chosen){i.status='exported';await persist(i);}render();notice('Downloaded '+chosen.length+' listings. Exported items are excluded from later exports; verify Depop import before treating them as listed.');}catch(e){notice(e.message);}};
+let exportURL='';
+const exportFeedback=document.createElement('div');exportFeedback.id='exportFeedback';exportFeedback.setAttribute('role','status');exportFeedback.setAttribute('aria-live','polite');$('export').after(exportFeedback);
+$('export').onclick=async()=>{
+ try{
+ const chosen=[...selected].map(s=>items.get(s)).filter(i=>i?.approved);
+ if(!chosen.length)throw Error('Check the box beside an approved listing, then click Export approved selection.');
+ const csv=exportCSV(chosen,tax);
+ if(exportURL)URL.revokeObjectURL(exportURL);
+ exportURL=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+ const link=document.createElement('a');link.href=exportURL;link.download='AtlantaJake_Depop_'+new Date().toISOString().slice(0,10)+'.csv';link.textContent='Download CSV ('+chosen.length+' '+(chosen.length===1?'listing':'listings')+')';link.className='button secondary';
+ exportFeedback.replaceChildren(link,document.createTextNode(' Your CSV is ready. If the download did not start, click Download CSV. You can download this selection again.'));
+ link.click();notice('CSV ready for '+chosen.length+' listings. Use the Download CSV link under Export approved selection.');
+ const saveErrors=[];
+ for(const i of chosen){const draft={...i,status:'exported'};try{await persist(draft);items.set(i.sku,draft);}catch(e){saveErrors.push(i.sku);}}
+ render();
+ if(saveErrors.length){const warning=' CSV is ready, but export status could not be saved for '+saveErrors.join(', ')+'.';exportFeedback.append(document.createTextNode(warning));notice(warning);}
+ }catch(e){exportFeedback.textContent=e.message;notice(e.message);}
+};
