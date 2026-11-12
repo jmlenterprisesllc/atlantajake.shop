@@ -3,6 +3,6 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-11-01",
   "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": true },
-  "r2_buckets": [{"binding":"PHOTOS","bucket_name":"atlantajake-listing-photos"}],
+  "vars": {"DRIVE_ROOT_FOLDER_ID":"1Q7wJXiDGx13w11FZM6vix7mOZiUITEqU"},
   "d1_databases": [{"binding":"DB","database_name":"atlantajake-listings","database_id":"REPLACE_AFTER_ACCOUNT_SETUP","migrations_dir":"migrations"}]
 }

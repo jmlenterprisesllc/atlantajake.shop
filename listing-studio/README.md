@@ -14,7 +14,11 @@ A separate, account-ready pilot for the owner's listing workflow. The public sto
 - D1 records survive sessions after connection and processing; public image links are served from R2 through the Worker. No credentials or private inventory are checked into GitHub.
 - Template version 6 CSV export, maximum 100 approved items per file. Exported items are excluded from subsequent exports. Export is not proof of Depop import or publication.
 
-## First-run account setup
+## Recommended setup
+
+Use [SETUP.md](SETUP.md) for the private Google Drive workflow. It uses Drive originals directly and does not require R2. The legacy Mac-folder upload mode is optional. Drive-backed marketplace links still require a live Depop acceptance test.
+
+## Legacy R2 setup (optional)
 
 1. Create a Cloudflare account at https://dash.cloudflare.com/sign-up. This does not require moving the storefront or its DNS. Start with a workers.dev address.
 2. Create an OpenAI developer account/project at https://platform.openai.com/ and configure API access/billing or available credits. Create a project API key. Do not paste it into GitHub, the browser dashboard, or a chat message.
@@ -51,7 +55,7 @@ Taxonomy is extracted from the provided version 6 template. This pilot is intent
 
 ## Drive and your domain
 
-The current pilot still uses R2. Google Drive ingestion and Drive-backed image delivery are planned, not implemented. Upload original SKU folders to one private Drive parent folder. Future access requires Google authorization and a real Depop image-link test.
+Drive folder ingestion and signed per-photo delivery are implemented. Configure the service identity, share only the master photo folder as Viewer, and enter server-side secrets as described in SETUP.md. This has been tested with mocked Google responses; live Google authorization and Depop image import remain unverified. Drive originals stay private; selected photo links are individually accessible for marketplace import. R2 is optional and has been removed from the default deployment configuration.
 
 GitHub Pages cannot enforce this server sign-in wall. Route a studio subdomain or path to the authenticated backend after hosting is configured. Do not deploy public/ alone to Pages as a protected dashboard. No routing or deployment changes have been made.
 
