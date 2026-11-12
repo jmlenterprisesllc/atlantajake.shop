@@ -2,6 +2,7 @@ import {driveReady,skuFolders,drivePhotos,photoResponse} from './drive.js';
 import {authorised,session,sessionCookie,logoutCookie,loginPage,correctPassword} from './auth.js';
 import {description,validate,formatTitle} from '../public/core.js';
 import {LISTING_INSTRUCTIONS} from './listing-prompt.js';
+import {LISTING_STANDARD,listingSchema,resolveBrand} from './listing-quality.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
 const skuOK=s=>/^AJ\d+$/.test(s);
 export default {async fetch(req,env){
@@ -58,9 +59,10 @@ export default {async fetch(req,env){
  await env.PHOTOS.put(key,bytes,{httpMetadata:{contentType:'image/jpeg'}});return json({key,url});}
  if(path==='/api/analyze'&&req.method==='POST'){
  if(!env.OPENAI_API_KEY||!env.OPENAI_MODEL)return json({error:'Connect an OpenAI API key and model before analysis.'},503);
- const {sku}=await req.json();if(!skuOK(sku))return json({error:'Invalid SKU'},400);
+ const {sku,replace=false}=await req.json();if(!skuOK(sku))return json({error:'Invalid SKU'},400);
  const record=await env.DB.prepare('SELECT data FROM items WHERE sku=?').bind(sku).first();if(!record)return json({error:'Item not found'},404);const item=JSON.parse(record.data);
- if(item.analysis)return json(item); // Repeated clicks must not create repeat charges.
+ if(item.analysis&&!replace)return json(item); // Repeated batch clicks must not create repeat charges.
+ if(replace&&item.status==='exported')return json({error:'Exported listings are retained. Review existing exports before replacing a draft.'},409);
  if(!item.photos?.length||item.photos.length>8||item.photos.some(p=>p.provider==='drive'?(!driveReady(env)||!p.fileId||!p.folderId):!new RegExp('^'+sku+'/[a-f0-9]{64}\\.jpg$').test(p.key)))return json({error:'Upload 1–8 matching photos first'},400);
  const tax=await (await env.ASSETS.fetch(new Request(u.origin+'/taxonomy.json'))).json();
  const candidates=tax.brands.filter(b=>{const name=b.split(' (')[0].toLowerCase();return name==='other'||name.length>2&&(JSON.stringify(item.source).toLowerCase().includes(name)||['champion','fruit of the loom','tultex','hanes','jerzees','lee','harley davidson','polo ralph lauren','guess','disney','looney tunes','jansport'].includes(name));});
@@ -70,11 +72,10 @@ export default {async fetch(req,env){
  const driveSets=new Map();
  const content=[{type:'input_text',text:JSON.stringify({inventory:item.source,brandOptions:candidates,colors:tax.colors,ages:tax.ages,styles:tax.styles,category:'Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)'})}];
  for(const p of item.photos){if(p.provider==='drive'){if(!driveSets.has(p.folderId))driveSets.set(p.folderId,await drivePhotos(env,sku,p.folderId,u.origin));const current=driveSets.get(p.folderId);const match=current.find(f=>f.fileId===p.fileId);if(!match)return json({error:'Photo missing from SKU folder'},400);content.push({type:'input_image',image_url:match.url,detail:'high'});}else{if(!env.PHOTOS||!await env.PHOTOS.head(p.key))return json({error:'Photo missing; reupload '+p.name},400);content.push({type:'input_image',image_url:u.origin+'/photos/'+p.key,detail:'high'});}}
- const properties=Object.fromEntries(['title','body','brand','category','color','age','style1','style2','size'].map(k=>[k,{type:'string'}]));properties.title.description='A concise, factual Depop search title in Title Case, with verified identifying words and Crewneck Sweatshirt in natural order.';properties.tagMissing={type:'boolean'};properties.hashtags={type:'array',items:{type:'string'}};properties.flags={type:'array',items:{type:'string'}};
- const result=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL,store:false,instructions:LISTING_INSTRUCTIONS,input:[{role:'user',content}],text:{format:{type:'json_schema',name:'depop_listing',strict:true,schema:{type:'object',properties,required:Object.keys(properties),additionalProperties:false}}},max_output_tokens:1800})});
+ const result=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL,store:false,instructions:LISTING_INSTRUCTIONS,input:[{role:'user',content}],text:{format:{type:'json_schema',name:'depop_listing',strict:true,schema:listingSchema(tax)}},max_output_tokens:2600})});
  if(!result.ok)return json({error:'Image analysis failed ('+result.status+'). Check account billing/model access; retry manually.'},502);
- const response=await result.json();const text=response.output?.flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');if(!text)return json({error:'Analysis returned no listing. Review model response before retrying.'},502);
- item.analysis=JSON.parse(text);item.analysis.title=formatTitle(item.analysis.title);item.description=description(item);item.flags=[...item.analysis.flags,...validate(item,tax)];item.approved=false;item.status='review';item.usage=response.usage;
+ const response=await result.json();if(response.status==='incomplete')return json({error:'Analysis was incomplete. No draft was replaced; retry manually.'},502);const text=response.output?.flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');if(!text)return json({error:'Analysis returned no listing. Review model response before retrying.'},502);
+ item.analysis=JSON.parse(text);const maker=resolveBrand(item.analysis.brand,tax.brands);item.analysis.brand=maker.brand;if(maker.warning)item.analysis.flags.push(maker.warning);item.listingStandard=LISTING_STANDARD;item.analysis.title=formatTitle(item.analysis.title);item.description=description(item);item.flags=[...item.analysis.flags,...validate(item,tax)];item.approved=false;item.status='review';item.usage=response.usage;
  await env.DB.prepare('UPDATE items SET data=?,updated=? WHERE sku=?').bind(JSON.stringify(item),Date.now(),sku).run();return json(item);
  } finally { await env.DB.prepare('DELETE FROM analysis_locks WHERE sku=?').bind(sku).run(); }
  }
