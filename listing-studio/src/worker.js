@@ -26,7 +26,7 @@ export default {async fetch(req,env){
  const started=Date.now();let response;
  try{response=await photoResponse(req,env,dp[1],dp[2],dp[3]);}
  catch{response=json({error:'Photo delivery failed.'},502);}
- console.info('PHOTO_DELIVERY '+JSON.stringify({sku:dp[1],method:req.method,status:response.status,contentType:response.headers.get('Content-Type'),declaredBytes:response.headers.get('Content-Length'),elapsedMs:Date.now()-started,client:(req.headers.get('User-Agent')||'unknown').slice(0,160)}));
+ console.info('PHOTO_DELIVERY '+JSON.stringify({sku:dp[1],method:req.method,status:response.status,contentType:response.headers.get('Content-Type'),declaredBytes:response.headers.get('Content-Length'),imageFormat:response.headers.get('X-Photo-Format'),elapsedMs:Date.now()-started,client:(req.headers.get('User-Agent')||'unknown').slice(0,160)}));
  return response;
  }
  if(path.startsWith('/photos/')){if(req.method!=='GET'&&req.method!=='HEAD')return json({error:'Method not allowed'},405);const key=path.slice(8);if(!/^AJ\d+\/[a-f0-9]{64}\.jpg$/.test(key))return json({error:'Not found'},404);if(!env.PHOTOS)return json({error:'Not found'},404);const o=await env.PHOTOS.get(key);if(!o)return json({error:'Not found'},404);return new Response(req.method==='HEAD'?null:o.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});}
