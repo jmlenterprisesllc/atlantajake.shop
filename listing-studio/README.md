@@ -66,3 +66,11 @@ No direct Depop publishing, discount application, sold detection, automatic dele
 ## Verification
 
 `npm test` runs CSV/parser, store-rule, authentication, upload validation, cached-analysis and mocked image-analysis integration tests. These tests do not prove live account configuration, browser folder handling, visual quality of compressed originals, or Depop acceptance; those require the account-connected pilot.
+
+## Reviewing a batch
+
+Each listing needs explicit approval before CSV export. Export includes only approved records in the selected batch; other selected records can remain in review. This is a Studio workflow rule.
+
+Approve & next saves the current review and opens the next analyzed, unapproved record in the current review selection. Save changes keeps the current item as a draft. Choosing a different cover saves that photo order and any pending form edits, clears approval, and keeps the existing analysis. Reapprove to advance; neither changing the cover nor approving calls OpenAI.
+
+The editable title and the description's opening line stay synchronized. Title Case cleanup also applies to existing approved CSV exports without regenerating descriptions. New analyses use the expanded factual title, description and hashtag guidance in src/listing-prompt.js. Cached listings do not automatically receive a new semantic rewrite or another paid analysis. Keyword relevance and accurate attributes require item-specific review; formatting alone is not an SEO audit or ranking guarantee.

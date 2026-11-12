@@ -2,17 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
+import {reviewDraft,coverDraft,nextReviewSKU} from '../public/core.js';
 const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
-const start=app.indexOf(' const save=async approved=>');
-const end=app.indexOf(";$('save').onclick",start);
-const source=app.slice(start,end)+'; save';
-function setup({errors=[],fail=false}={}){
- const item={sku:'AJ1028',analysis:{size:'S'},approved:false,status:'review',error:'old analysis error'};
- const controls={save:{},approve:{},reviewFeedback:{},price:{value:'56.25'},condition:{value:'good'},description:{value:'Reviewed description'},review:{querySelectorAll:()=>[{dataset:{field:'size'},value:'M'}]}};
- const items=new Map([[item.sku,item]]);let saved;
- const save=vm.runInNewContext(source,{i:item,$:id=>controls[id],structuredClone,tax:{},validate:()=>errors,notice:()=>{},persist:async draft=>{if(fail)throw Error('Session expired. Sign in again.');saved=draft;},items,render:()=>{},review:()=>{}});
- return {save,item,controls,items,get saved(){return saved;}};
+const start=app.indexOf(' const save=async approved=>'),end=app.indexOf(";$('save').onclick",start);
+const coverStart=app.indexOf('async function chooseCover('),coverEnd=app.indexOf('\nfunction review(){',coverStart);
+function setup({errors=[],fail=false,others=[],selection,item:existingItem}={}){
+ const item=existingItem?structuredClone(existingItem):{sku:'AJ1028',analysis:{title:'Honda Racing Black Crewneck Sweatshirt',size:'S'},description:'Honda Racing Black Crewneck Sweatshirt\n\nReviewed item details.',price:'56.25',condition:'good',photos:[{name:'front.jpg',url:'https://studio.example/front.jpg'},{name:'back.jpg',url:'https://studio.example/back.jpg'}],approved:false,status:'review',error:'old analysis error'};
+ const controls={save:{},approve:{},reviewFeedback:{},title:{value:item.analysis.title},price:{value:'56.25'},condition:{value:'good'},description:{value:item.description},review:{querySelectorAll:()=>[{dataset:{field:'size'},value:'M'}]}};
+ const items=new Map([item,...others].map(i=>[i.sku,i]));let saved,saveCount=0;
+ const context=vm.createContext({i:item,active:item.sku,busy:false,reviewSaving:false,$:id=>controls[id],structuredClone,tax:{},validate:()=>errors,readReviewDraft:i=>reviewDraft(i,{title:controls.title.value,description:controls.description.value,price:controls.price.value,condition:controls.condition.value,fields:{size:'M'}}),coverDraft,nextReviewSKU,visible:()=>[...items.values()],selected:new Set(selection||[...items.keys()]),reviewFeedback:message=>{controls.reviewFeedback.textContent=message;},setReviewBusy:value=>{controls.save.disabled=value;controls.approve.disabled=value;},persist:async draft=>{saveCount++;if(fail)throw Error('Session expired. Sign in again.');saved=draft;},items,render:()=>{},review:()=>{}});
+ const save=vm.runInContext(app.slice(start,end)+'; save',context);
+ const chooseCover=vm.runInContext(app.slice(coverStart,coverEnd)+'; chooseCover',context);
+ return {save,chooseCover,item,controls,items,get active(){return context.active;},get saved(){return saved;},get saveCount(){return saveCount;}};
 }
+const pending=sku=>({sku,analysis:{title:'Another Crewneck Sweatshirt'},approved:false,status:'review'});
 test('Approval saves edited draft and confirms readiness next to buttons',async()=>{const t=setup();await t.save(true);assert.equal(t.saved.approved,true);assert.equal(t.saved.analysis.size,'M');assert.equal(t.saved.error,'');assert.equal(t.items.get('AJ1028').status,'approved');assert.match(t.controls.reviewFeedback.textContent,/approved and ready for CSV export/);assert.equal(t.controls.approve.disabled,false);});
-test('Blocked approval shows validation errors next to buttons and preserves draft',async()=>{const t=setup({errors:['Use exactly five hashtags']});await t.save(true);assert.equal(t.saved,undefined);assert.equal(t.item.approved,false);assert.match(t.controls.reviewFeedback.textContent,/Cannot approve: Use exactly five hashtags/);});
-test('Failed save does not mark item approved and reports the failure inline',async()=>{const t=setup({fail:true});await t.save(true);assert.equal(t.items.get('AJ1028').approved,false);assert.match(t.controls.reviewFeedback.textContent,/Session expired/);assert.equal(t.controls.save.disabled,false);});
+test('Successful approval advances to the next analyzed unapproved item in the selected batch',async()=>{const t=setup({others:[pending('AJ1029'),pending('AJ1030')]});await t.save(true);assert.equal(t.active,'AJ1029');assert.match(t.controls.reviewFeedback.textContent,/Now reviewing AJ1029/);});
+test('Cover change preserves unsaved edits, clears approval and advances after reapproval',async()=>{const t=setup({others:[pending('AJ1029')]});t.item.approved=true;t.item.status='approved';t.controls.title.value='red rah rah 20 crewneck sweatshirt';t.controls.description.value='Old title\n\nEdited details that must survive the cover change.';t.controls.price.value='72.50';await t.chooseCover(1);const changed=t.items.get('AJ1028');assert.equal(changed.photos[0].name,'back.jpg');assert.equal(changed.approved,false);assert.equal(changed.status,'review');assert.equal(changed.price,'72.50');assert.match(changed.description,/Edited details that must survive/);assert.equal(changed.analysis.title,'Red Rah Rah 20 Crewneck Sweatshirt');assert.equal(t.active,'AJ1028');const nextReview=setup({item:changed,others:[pending('AJ1029')]});await nextReview.save(true);assert.equal(nextReview.active,'AJ1029');assert.equal(nextReview.saved.photos[0].name,'back.jpg');assert.match(nextReview.saved.description,/Edited details that must survive/);});
+test('Clicking current cover is a no-op and does not clear approval',async()=>{const t=setup();t.item.approved=true;await t.chooseCover(0);assert.equal(t.saveCount,0);assert.equal(t.item.approved,true);});
+test('Save changes retains the current item as a draft',async()=>{const t=setup({others:[pending('AJ1029')]});await t.save(false);assert.equal(t.active,'AJ1028');assert.equal(t.saved.approved,false);assert.match(t.controls.reviewFeedback.textContent,/still a draft/);});
+test('Blocked approval shows errors inline, preserves draft and does not advance',async()=>{const t=setup({errors:['Use exactly five hashtags'],others:[pending('AJ1029')]});await t.save(true);assert.equal(t.saved,undefined);assert.equal(t.item.approved,false);assert.equal(t.active,'AJ1028');assert.match(t.controls.reviewFeedback.textContent,/Cannot approve: Use exactly five hashtags/);});
+test('Failed save does not mark item approved or advance',async()=>{const t=setup({fail:true,others:[pending('AJ1029')]});await t.save(true);assert.equal(t.items.get('AJ1028').approved,false);assert.equal(t.active,'AJ1028');assert.match(t.controls.reviewFeedback.textContent,/Session expired/);assert.equal(t.controls.save.disabled,false);});
+test('Failed cover save preserves the previous approved cover',async()=>{const t=setup({fail:true});t.item.approved=true;await t.chooseCover(1);assert.equal(t.items.get('AJ1028').photos[0].name,'front.jpg');assert.equal(t.items.get('AJ1028').approved,true);assert.match(t.controls.reviewFeedback.textContent,/Session expired/);});
