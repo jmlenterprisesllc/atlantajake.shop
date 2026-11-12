@@ -6,6 +6,8 @@ const skuOK=s=>/^AJ\d+$/.test(s);
 export default {async fetch(req,env){
  try{
  const u=new URL(req.url),path=u.pathname;
+ const dp=path.match(/^\/photos\/drive\/(AJ\d+)\/([A-Za-z0-9_-]{10,200})\/([a-f0-9]{64})(?:\/image\.(?:jpg|png|webp))?$/);
+ if(dp&&req.method==='OPTIONS')return photoResponse(req,env,dp[1],dp[2],dp[3]);
  const privateHeaders={'Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow','Referrer-Policy':'same-origin','Content-Security-Policy':"default-src 'self'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"};
  if(!['GET','HEAD'].includes(req.method)&&(req.headers.get('Sec-Fetch-Site')==='cross-site'||req.headers.get('Origin')&&req.headers.get('Origin')!==u.origin))return json({error:'Cross-site request rejected'},403);
  if(path==='/login'&&req.method==='GET')return new Response(loginPage,{headers:{...privateHeaders,'Content-Type':'text/html;charset=utf-8'}});
@@ -18,7 +20,7 @@ export default {async fetch(req,env){
  if(path==='/auth/logout'&&req.method==='POST')return new Response(null,{status:303,headers:{...privateHeaders,Location:'/login','Set-Cookie':logoutCookie}});
  if(path==='/studio.css'&&req.method==='GET')return env.ASSETS.fetch(req);
 
- const dp=path.match(/^\/photos\/drive\/(AJ\d+)\/([A-Za-z0-9_-]{10,200})\/([a-f0-9]{64})$/);
+
  if(dp){if(!['GET','HEAD'].includes(req.method))return json({error:'Method not allowed'},405);return photoResponse(req,env,dp[1],dp[2],dp[3]);}
  if(path.startsWith('/photos/')){if(req.method!=='GET'&&req.method!=='HEAD')return json({error:'Method not allowed'},405);const key=path.slice(8);if(!/^AJ\d+\/[a-f0-9]{64}\.jpg$/.test(key))return json({error:'Not found'},404);if(!env.PHOTOS)return json({error:'Not found'},404);const o=await env.PHOTOS.get(key);if(!o)return json({error:'Not found'},404);return new Response(req.method==='HEAD'?null:o.body,{headers:{'Content-Type':'image/jpeg','Cache-Control':'public, max-age=86400','X-Content-Type-Options':'nosniff'}});}
  if(!path.startsWith('/api/')){if(!await authorised(req,env))return new Response(null,{status:303,headers:{...privateHeaders,Location:'/login'}});const r=await env.ASSETS.fetch(req);const h=new Headers(r.headers);h.set('Cache-Control','no-store');h.set('X-Robots-Tag','noindex, nofollow');h.set('Content-Security-Policy',"default-src 'self'; img-src 'self' blob:; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");h.set('Referrer-Policy','no-referrer');return new Response(r.body,{status:r.status,headers:h});}
