@@ -11,8 +11,9 @@ export function validate(item,tax){const a=item.analysis;const e=[];if(!a)return
 export function photoDeliveryURL(photo,origin){
  if(!origin||photo.provider!=='drive')return photo.url;
  const current=new URL(photo.url),target=new URL(origin);
- if(target.protocol!=='https:'||!/^\/photos\/drive\/AJ\d+\/[A-Za-z0-9_-]{10,200}\/[a-f0-9]{64}$/.test(current.pathname))throw Error('Invalid photo delivery URL');
- return target.origin+current.pathname;
+ if(target.protocol!=='https:'||!/^\/photos\/drive\/AJ\d+\/[A-Za-z0-9_-]{10,200}\/[a-f0-9]{64}(?:\/image\.(?:jpg|png|webp))?$/.test(current.pathname))throw Error('Invalid photo delivery URL');
+ const ext=({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[photo.mimeType]||current.pathname.match(/\/image\.(jpg|png|webp)$/)?.[1]||'jpg';
+ return target.origin+current.pathname.replace(/\/image\.(jpg|png|webp)$/,'')+'/image.'+ext;
 }
 export function listingRow(item,tax,photoOrigin){const a=item.analysis;return Object.fromEntries(tax.headers.map(h=>[h,({'Description':item.description||description(item),'Category':a.category,'Price':item.price,'Brand':a.brand,'Condition':item.condition,'Size':a.size,'Color 1':a.color,'Color 2':'Multi (multi)','Source 1':'Vintage (vintage)','Source 2':'Preloved (preloved)','Age':a.age,'Style 1':a.style1,'Style 2':a.style2,'Style 3':'Y2K (y2_k)','Location':'United States','Domestic Shipping price':'0','International Shipping price':'25','SKU':item.sku,...Object.fromEntries((item.photos||[]).map((p,i)=>[i===0?'Picture Hero url':`Picture ${i+1} url`,photoDeliveryURL(p,photoOrigin)]))})[h]??'']));}
 export function exportCSV(items,tax,photoOrigin){if(!items.length||items.length>100)throw Error('Export 1–100 listings at a time.');for(const i of items){const e=validate(i,tax);if(e.length||!i.approved)throw Error(i.sku+': '+(e.join('; ')||'Review and approve first'));}const records=[['Template version: 6',...Array(25).fill('')],tax.headers,tax.instructions,...items.map(i=>{const r=listingRow(i,tax,photoOrigin);return tax.headers.map(h=>r[h]);})];return records.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n');}
