@@ -1,3 +1,4 @@
+import {primaryJPEG} from './jpeg.js';
 import {SignJWT,importPKCS8} from 'jose';
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
 const FOLDER='application/vnd.google-apps.folder';
@@ -45,7 +46,12 @@ export async function photoResponse(req,env,sku,id,sig){
  const headers={'Content-Type':file.mimeType,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, HEAD, OPTIONS','Access-Control-Expose-Headers':'Content-Length, Content-Type','Content-Disposition':'inline; filename="'+sku+'-'+id+'.'+extension(file.mimeType)+'"'};
  if(file.size&&/^\d+$/.test(String(file.size)))headers['Content-Length']=String(file.size);
  if(req.method==='OPTIONS'){delete headers['Content-Length'];return new Response(null,{status:204,headers});}
- if(req.method==='HEAD')return new Response(null,{headers});
+ if(req.method==='HEAD'&&file.mimeType!=='image/jpeg')return new Response(null,{headers});
  const result=await driveRequest(env,'files/'+id,{alt:'media',supportsAllDrives:'true'});
+ if(file.mimeType==='image/jpeg'){
+ const original=new Uint8Array(await result.arrayBuffer()),prepared=primaryJPEG(original);
+ headers['Content-Length']=String(prepared.bytes.byteLength);headers['X-Photo-Format']=prepared.normalized?'primary-jpeg-from-mpo':'jpeg';
+ return new Response(req.method==='HEAD'?null:prepared.bytes,{headers});
+ }
  return new Response(result.body,{headers});
 }
