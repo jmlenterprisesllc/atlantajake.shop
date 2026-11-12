@@ -1,6 +1,7 @@
 import {SignJWT,importPKCS8} from 'jose';
 const ID=/^[A-Za-z0-9_-]{10,200}$/;
 const FOLDER='application/vnd.google-apps.folder';
+const extension=type=>({'image/jpeg':'jpg','image/png':'png','image/webp':'webp'})[type];
 let cachedToken;
 export const driveReady=env=>!!env.GOOGLE_SERVICE_ACCOUNT_JSON&&!!env.DRIVE_ROOT_FOLDER_ID&&!!env.PHOTO_LINK_SECRET;
 function requireID(id){if(!ID.test(id||''))throw Error('Invalid Drive identifier');return id;}
@@ -32,7 +33,7 @@ export async function drivePhotos(env,sku,folderId,origin){await confirmFolder(e
  const unsupported=all.filter(f=>f.mimeType.startsWith('image/')&&!photos.includes(f));if(unsupported.length)throw Error('Convert unsupported image types to JPEG: '+unsupported.map(f=>f.name).join(', '));
  if(!photos.length||photos.length>8)throw Error(sku+' needs 1–8 images; found '+photos.length+'. No files were discarded.');
  photos.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
- return Promise.all(photos.map(async f=>({provider:'drive',fileId:f.id,folderId,name:f.name,mimeType:f.mimeType,modifiedTime:f.modifiedTime,checksum:f.md5Checksum||'',url:origin+'/photos/drive/'+sku+'/'+f.id+'/'+await signature(env,sku,f.id)})));
+ return Promise.all(photos.map(async f=>({provider:'drive',fileId:f.id,folderId,name:f.name,mimeType:f.mimeType,modifiedTime:f.modifiedTime,checksum:f.md5Checksum||'',url:origin+'/photos/drive/'+sku+'/'+f.id+'/'+await signature(env,sku,f.id)+'/image.'+extension(f.mimeType)})));
 }
 export async function verifyPhoto(env,sku,photo){requireID(photo.fileId);requireID(photo.folderId);await confirmFolder(env,sku,photo.folderId);const file=await driveMeta(env,photo.fileId);if(file.trashed||!file.parents?.includes(photo.folderId)||!['image/jpeg','image/png','image/webp'].includes(file.mimeType))throw Error('Photo no longer belongs to this SKU folder.');return file;}
 export async function photoResponse(req,env,sku,id,sig){
@@ -41,7 +42,10 @@ export async function photoResponse(req,env,sku,id,sig){
  // Recheck folder membership on every request; a moved or trashed original stops delivery.
  const file=await driveMeta(env,id);const folderId=file.parents?.[0];if(!folderId||file.trashed)return new Response('Not found',{status:404});
  await verifyPhoto(env,sku,{fileId:id,folderId});
- if(req.method==='HEAD')return new Response(null,{headers:{'Content-Type':file.mimeType,'Cache-Control':'no-store'}});
+ const headers={'Content-Type':file.mimeType,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, HEAD, OPTIONS','Access-Control-Expose-Headers':'Content-Length, Content-Type','Content-Disposition':'inline; filename="'+sku+'-'+id+'.'+extension(file.mimeType)+'"'};
+ if(file.size&&/^\d+$/.test(String(file.size)))headers['Content-Length']=String(file.size);
+ if(req.method==='OPTIONS'){delete headers['Content-Length'];return new Response(null,{status:204,headers});}
+ if(req.method==='HEAD')return new Response(null,{headers});
  const result=await driveRequest(env,'files/'+id,{alt:'media',supportsAllDrives:'true'});
- return new Response(result.body,{headers:{'Content-Type':file.mimeType,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow'}});
+ return new Response(result.body,{headers});
 }
