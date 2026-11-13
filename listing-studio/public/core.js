@@ -36,11 +36,17 @@ export function sellerFactErrors(item){
  const errors=[];
  const datedVintage=notes.match(/\bvintage\s+(19[5-9]\d|200\d)\b/i);
  if(datedVintage&&!new RegExp('\\b'+datedVintage[1]+'\\b').test(title))errors.push('Seller-confirmed vintage year '+datedVintage[1]+' is missing from the title.');
+ const sourceYears=[...new Set([...String(source['Item Name']||'').matchAll(/\b(?:19[5-9]\d|20[0-2]\d)\b/g)].map(m=>m[0]))];
+ if(!datedVintage&&sourceYears.length===1&&!new RegExp('\\b'+sourceYears[0]+'\\b').test(title))errors.push('Seller-described year '+sourceYears[0]+' is missing from the title.');
  const eventYear=notes.match(/\b(19\d{2}|20\d{2})\s+(?:summer\s+|winter\s+)?olympics\b/i);
  if(eventYear&&!new RegExp('\\b'+eventYear[1]+'\\b').test(title))errors.push('Seller-described Olympics year '+eventYear[1]+' is missing from the title.');
  const numberedGraphic=notes.match(/\b(?:number|#)\s*(\d{1,3})\b/i);
  if(numberedGraphic&&!new RegExp('\\b'+numberedGraphic[1]+'\\b').test(title))errors.push('Seller-described graphic number '+numberedGraphic[1]+' is missing from the title.');
  if(/\b(?:insanely|super|very)?\s*soft\b/i.test(notes)&&!/\bsoft\b/i.test(body))errors.push('Seller-described soft feel is missing from the sales description.');
+ if(/\bstains?\b/i.test(notes)&&!/\bstains?\b/i.test(body))errors.push('Documented stains must be disclosed in the sales description.');
+ if(/\b(?:sun\s?faded?|sunfade|fading)\b/i.test(notes)&&!/\b(?:sun\s?faded?|sunfade|fading)\b/i.test(body))errors.push('Seller-described fading is missing from the sales description.');
+ if(/\b(?:graphic\s+cracking|cracked\s+graphic)\b/i.test(notes)&&!/\b(?:crack(?:ing|ed|s)?)\b/i.test(body))errors.push('Documented graphic cracking must be disclosed in the sales description.');
+ if(/\b(?:no tag|tag removed|missing tag)\b/i.test(notes)&&!/\b(?:(?:no|missing|removed)\s+(?:original\s+)?tag|tag\s+(?:is\s+)?(?:missing|removed))\b/i.test(body))errors.push('Seller-reported missing tag must be disclosed in the sales description.');
  const contrastingCuffs=notes.match(/\b(black|white|red|blue|green|yellow|purple|pink|orange|brown|grey|gray)\s+cuffs\b/i);
  if(contrastingCuffs&&(!new RegExp('\\b'+contrastingCuffs[1]+'\\b','i').test(body)||!/\bcuffs\b/i.test(body)))errors.push('Seller-described '+contrastingCuffs[1]+' cuffs are missing from the sales description.');
  if(/\b(?:collar\s+(?:has\s+been\s+)?cut(?:\s+out)?|cut\s+collar|collar\s+removed)\b/i.test(notes)&&(!/\b(?:cut|removed|altered)\b/i.test(copy)||!/\b(?:collar|neck|neckline)\b/i.test(copy)))errors.push('Seller-described cut collar must be disclosed in the listing.');

@@ -127,6 +127,19 @@ test('Event year and contrasting cuffs survive beyond the Rah Rah regression cas
  i.analysis.body+=' Off white fabric with green cuffs.';i.description=description(i);
  assert.deepEqual(sellerFactErrors(i),[]);
 });
+test('Seller years outside a Vintage YYYY phrase are retained without guessing a manufacturing date',()=>{
+ const i=item();i.source['Item Name']='Vintage deep purple Harley Davidson crewneck 1995';
+ assert.ok(sellerFactErrors(i).some(e=>e.includes('year 1995')));
+ i.analysis.title='Vintage 1995 Harley Davidson Purple Crewneck Sweatshirt';i.description=description(i);
+ assert.deepEqual(sellerFactErrors(i),[]);
+});
+test('Documented flaws and missing tag cannot disappear from customer copy',()=>{
+ const i=item();i.source['Item Name']='Vintage 80s Harvard crewneck, sun faded, minor stains, graphic cracking, no tag';
+ const errors=sellerFactErrors(i);
+ for(const phrase of ['stains','fading','cracking','missing tag'])assert.ok(errors.some(e=>e.includes(phrase)),phrase);
+ i.analysis.body+=' There are minor stains, sun fading and cracking in the graphic. No original tag remains.';
+ i.description=description(i);assert.deepEqual(sellerFactErrors(i),[]);
+});
 test('Optional styles can remain blank instead of adding unrelated search terms',()=>{
  const i=item();i.analysis.style1='';i.analysis.style2='';i.analysis.style3='';i.analysis.color2='';
  assert.equal(validate(i,tax).length,0);const row=listingRow(i,tax);
