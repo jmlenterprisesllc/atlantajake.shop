@@ -1,6 +1,6 @@
 # AtlantaJake Depop listing standard
 
-Researched November 12, 2026. Generator standard: `2026-11-12-relevance-v2`.
+Researched November 12, 2026. Generator standard: `2026-11-12-seller-facts-v3`.
 
 The objective is accurate, distinctive, commercially useful listings that cover relevant buyer searches. Successful CSV imports, capitalization, valid dropdown values and passing software tests do not establish that objective by themselves.
 
@@ -25,7 +25,7 @@ There is no published exact weighting, optimal keyword density, fixed ideal titl
 ## The listing process
 
 1. Inspect every supplied photograph, including tag, back, sleeves and flaws. Read seller notes as evidence, while separating merchandising buckets from manufacturers. In this inventory, `Brand: Streetwear` is often a bucket.
-2. Record useful facts with support: inventory field and supporting words, or photo number and visible/readable detail. Prioritize identity, garment type, maker, date/era, graphic, construction, material, size and alterations. Evidence notes are model-produced review aids, not independent verification.
+2. Treat explicit seller-established dates, vintage status, size and softness as facts; do not undermine them just because a photo cannot establish them independently. Clear conflicts belong in the private review notes. Record useful facts with support: inventory field and supporting words, or photo number and visible/readable detail. Prioritize identity, garment type, maker, date/era, graphic, construction, material, size and alterations. Evidence notes are model-produced review aids, not independent verification.
 3. Form two to four plausible buyer phrases. These are editorial hypotheses, not measured search-volume data. Cover a specific identity and relevant broader garment/subject/style intent.
 4. Compose a readable title around the strongest supported identity and exact item type. Add useful era, color or distinctive graphic when established. Do not repeat synonyms merely to lengthen it. A date printed on a design can identify an event without proving manufacture year.
 5. Write two or three concise sentences that add details beyond the title. Preserve valuable seller facts. Include supplied measurements exactly; never infer fit or measurements from a flat photograph. Disclose documented alterations and flaws. A used-condition grade alone does not establish fading, stains or holes.
@@ -41,7 +41,7 @@ The following are editorial benchmarks grounded in the current master inventory 
 
 | SKU | Relevant seller evidence | Expected editorial behavior | Check before approval |
 | --- | --- | --- | --- |
-| AJ1060 | Red; vintage 1985; Rah Rah and 20 front graphic; soft fabric; size S | Preserve the distinctive Rah Rah / 20 graphic, red color and supported era information. Working title: **Vintage 80s Rah Rah 20 Red Graphic Crewneck Sweatshirt**. Mention the soft fabric in prose rather than inventing its composition. | Confirm the 1985 dating rather than treating a printed date as manufacture proof. Rah Rah is not automatically a maker, team or player. Confirm tag and size. |
+| AJ1060 | Red; vintage 1985; Rah Rah and 20 front graphic; soft fabric; size S | Preserve the distinctive Rah Rah / 20 graphic, red color and supported era information. Working title: **Vintage 1985 Rah Rah 20 Red Graphic Crewneck Sweatshirt**. Mention the soft fabric in prose rather than inventing its composition. | The seller has explicitly confirmed 1985; preserve that date. Do not reinterpret that statement as only an unverified copyright year. Rah Rah is not automatically a maker, team or player. Confirm tag and size. |
 | AJ1030 | Champion; Atlanta 1996 Olympics; green; embroidery; L; condition AB | A supported title direction is **Vintage Champion Atlanta 1996 Olympics Green Crewneck Sweatshirt**. The body should cover embroidery and tag details. | Confirm maker and official Olympic identity from photos; distinguish event year from manufacturing year. Do not invent material or flawless condition. |
 | AJ1031 | HOYAS; grey; bulldog graphic; seller identifies 80s vintage; collar cut into V neck; L; condition B | Preserve the alteration prominently. Describe the current V neckline; do not call it an intact crewneck. Use Georgetown only if identity is established. | Cut collar must not be buried or omitted. Tag sizing, condition and school identity need review. |
 | AJ1029 | Seller writes 80s Agusta Golf; off white; green cuffs; XL | Capture the golf identity and contrasting cuffs. Resolve text/spelling from the actual graphic rather than silently upgrading it to Augusta National or Masters. | Tag maker, golf club identity, era and cream/white color. |
@@ -51,7 +51,8 @@ The earlier AJ1060 title failed because it flattened the record into a generic p
 
 ## Implemented changes and retained decisions
 
-- New generations distinguish a readable tagged size from an unverified seller-provided size, without calling an unseen tag missing.
+- Customer copy never includes internal evidence limitations or inventory verification commentary. Seller-confirmed dates and vintage status remain in copy; absence of independent photo proof does not turn them into vintage-inspired items.
+- Size lines use the supplied size without automatic tag-missing or unverified-size commentary. Tagged size is used only when the label is confirmed; a genuinely removed tag can be disclosed in condition prose when established.
 - Generation now returns inspectable evidence and buyer phrases along with listing copy. The prompt requests fact extraction before composition and useful factual coverage rather than simply paraphrasing the item name.
 - Brand hints no longer restrict the output to a short maker list. Exact/normalized unambiguous maker names resolve against the complete template; no fuzzy guess silently assigns a different brand.
 - Structured generation constrains category, color, age and styles to template values. Unknown era is blank, not a 90s fallback. Explicit inventory era conflicts and non-sweatshirt categories for crewneck inventory block approval and export, including previously approved drafts. Server approval writes enforce the same checks. Unrecognized dropdown values show an explicit invalid-value placeholder instead of silently selecting the first option. Duplicate hashtags are blocked by review validation.

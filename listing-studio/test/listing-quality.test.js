@@ -50,7 +50,7 @@ test('Exported listing replacement is blocked before any paid API call',async()=
  const r=await replace({exported:true});assert.equal(r.response.status,409);assert.equal(r.saved,undefined);assert.equal(r.calls,0);
 });
 
-test('Unreadable size labels are distinguished from missing tags and verified sizes',()=>{const i=item();i.analysis.tagMissing=false;i.analysis.sizeVerified=false;assert.match(description(i),/Size: S \(seller provided; tag size unverified\)/);i.analysis.sizeVerified=true;assert.match(description(i),/Tagged size: S/);i.analysis.tagMissing=true;assert.match(description(i),/Size: S \(tag missing\)/);});
+test('Size line uses the supplied size without exporting internal verification caveats',()=>{const i=item();i.analysis.tagMissing=false;i.analysis.sizeVerified=false;assert.match(description(i),/Size: S\n\nShipping/);i.analysis.sizeVerified=true;assert.match(description(i),/Tagged size: S/);i.analysis.tagMissing=true;assert.match(description(i),/Size: S\n\nShipping/);});
 
 test('Unknown dropdown values remain explicitly invalid instead of falling back to Collectibles',()=>{
  const options=dropdownChoices(tax.categories,'Men >> Tops >> Sweatshirts');
@@ -79,4 +79,11 @@ test('Server rejects approval writes with a valid but wrong category or contradi
   const response=await worker.fetch(new Request('https://studio.example/api/items/AJ1060',{method:'PUT',headers:{Authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify(i)}),env);
   assert.equal(response.status,422);assert.match((await response.json()).error,/Cannot approve/);assert.equal(writes,0);
  }
+});
+
+test('Internal verification commentary cannot be approved or exported as sales copy',()=>{
+ const i=item();i.approved=true;i.analysis.body='Inventory lists size S, but no readable neck tag is shown. The size is unverified.';
+ assert.throws(()=>exportCSV([i],tax),/Move internal verification commentary/);
+ i.analysis.body='Super soft red fabric with a bold 20 graphic and Rah Rah lettering.';
+ assert.equal(validate(i,tax).length,0);assert.ok(!description(i).includes('unverified'));
 });

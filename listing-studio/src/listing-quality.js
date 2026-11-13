@@ -1,5 +1,6 @@
 // This records a generation standard, not a search-ranking score.
-export const LISTING_STANDARD='2026-11-12-relevance-v2';
+import {LISTING_COPY_STANDARD} from '../public/core.js';
+export const LISTING_STANDARD=LISTING_COPY_STANDARD;
 const plain=value=>String(value||'').replace(/ \([^)]*\)$/,'');
 const key=value=>plain(value).normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g,'');
 export function resolveBrand(value,brands){
@@ -14,7 +15,7 @@ export function listingSchema(tax){
   evidence:{type:'array',minItems:1,maxItems:12,items:{type:'object',properties:{fact:string,support:string},required:['fact','support'],additionalProperties:false}},
   searchPhrases:{type:'array',minItems:2,maxItems:4,items:string},
   title:{type:'string',description:'Readable buyer phrase using the strongest supported identity, era/event and exact garment type. Title Case is presentation, not a ranking claim.'},
-  body:string,
+  body:{type:'string',description:'2–3 appealing customer-facing sales sentences preserving explicit seller facts. No inventory/photo-verification commentary or manufacturing-year disclaimer; put conflicts in flags.'},
   brand:{type:'string',description:'Actual maker from readable tag or reliable inventory, even if absent from brandOptions. Plain maker name accepted; server resolves against the entire template. Other if unknown.'},
   category:{type:'string',enum:['Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)']},
   color:{type:'string',enum:tax.colors},age:{type:'string',enum:['',...tax.ages]},
