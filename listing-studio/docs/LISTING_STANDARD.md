@@ -1,6 +1,6 @@
 # AtlantaJake Depop listing standard
 
-Researched November 12, 2026. Generator standard: `2026-11-12-seller-facts-v3`.
+Researched November 12, 2026. Generator standard: `2026-11-12-seller-facts-v4`.
 
 The objective is accurate, distinctive, commercially useful listings that cover relevant buyer searches. Successful CSV imports, capitalization, valid dropdown values and passing software tests do not establish that objective by themselves.
 
@@ -56,8 +56,9 @@ The earlier AJ1060 title failed because it flattened the record into a generic p
 - Generation now returns inspectable evidence and buyer phrases along with listing copy. The prompt requests fact extraction before composition and useful factual coverage rather than simply paraphrasing the item name.
 - Brand hints no longer restrict the output to a short maker list. Exact/normalized unambiguous maker names resolve against the complete template; no fuzzy guess silently assigns a different brand.
 - Structured generation constrains category, color, age and styles to template values. Unknown era is blank, not a 90s fallback. Explicit inventory era conflicts and non-sweatshirt categories for crewneck inventory block approval and export, including previously approved drafts. Server approval writes enforce the same checks. Unrecognized dropdown values show an explicit invalid-value placeholder instead of silently selecting the first option. Duplicate hashtags are blocked by review validation.
-- Secondary color, Source 1 and Style 3 are visible and editable. Blank values remain blank in the CSV. Age can be left unspecified during review.
-- The previously requested Multi / Vintage / Y2K defaults are retained as initial values for compatibility, with a visible warning. They are not endorsed as universal SEO choices. Recommendation: use only where relevant and remove unsupported defaults per item. Changing the shop-wide policy should be an explicit decision.
+- Secondary color, Source 1 and Style 3 are visible and editable. New generations return a secondary color only when a substantial part of the garment supports it. Style 3 starts blank; Source 1 is Vintage only for explicit vintage seller notes. Both primary style fields and age may be left blank when unsupported. Blank values remain blank in the CSV.
+- Old saved drafts may still carry the previous Multi / Vintage / Y2K defaults. Review those records individually; the new generation defaults do not silently rewrite previously approved exports.
+- A deterministic approval/export check blocks high-confidence omissions from seller notes: an explicit Vintage 1985 year, graphic number 20, soft feel, or cut collar. It checks the actual edited customer copy, so correcting the copy manually requires no new model call. This check cannot judge persuasive writing, establish photo authenticity, or detect every missing detail.
 - Older cached drafts are marked. Deployment does not rewrite their copy. Normal Analyze clicks still return cached results without another paid call.
 - An explicit single-item **Generate replacement draft (uses API credits)** action replaces copy/analysis and clears approval after success. Failure retains the saved draft. Exported items cannot be replaced through this action. It uses the existing configured model; the output allowance is increased from 1,800 to 2,600 tokens to accommodate evidence. No second automatic review call was added.
 - All CSV exports use the template’s exact city-level value `Atlanta, United States` (Atlanta, GA), including re-exports of saved approved items. Inventory storage notes do not override the shipping origin. Already imported Depop drafts/listings are not updated automatically.

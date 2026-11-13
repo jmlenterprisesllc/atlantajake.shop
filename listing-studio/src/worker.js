@@ -75,7 +75,12 @@ export default {async fetch(req,env){
  const result=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL,store:false,instructions:LISTING_INSTRUCTIONS,input:[{role:'user',content}],text:{format:{type:'json_schema',name:'depop_listing',strict:true,schema:listingSchema(tax)}},max_output_tokens:2600})});
  if(!result.ok)return json({error:'Image analysis failed ('+result.status+'). Check account billing/model access; retry manually.'},502);
  const response=await result.json();if(response.status==='incomplete')return json({error:'Analysis was incomplete. No draft was replaced; retry manually.'},502);const text=response.output?.flatMap(x=>x.content||[]).filter(x=>x.type==='output_text').map(x=>x.text).join('');if(!text)return json({error:'Analysis returned no listing. Review model response before retrying.'},502);
- item.analysis=JSON.parse(text);const maker=resolveBrand(item.analysis.brand,tax.brands);item.analysis.brand=maker.brand;if(maker.warning)item.analysis.flags.push(maker.warning);item.listingStandard=LISTING_STANDARD;item.analysis.title=formatTitle(item.analysis.title);item.description=description(item);item.flags=[...item.analysis.flags,...validate(item,tax)];item.approved=false;item.status='review';item.usage=response.usage;
+ item.analysis=JSON.parse(text);const maker=resolveBrand(item.analysis.brand,tax.brands);item.analysis.brand=maker.brand;if(maker.warning)item.analysis.flags.push(maker.warning);
+ // No blanket extra colors or Y2K. Color 2 comes from the specific garment;
+ // Source 1 uses explicit seller vintage notes. Older records remain unchanged.
+ item.analysis.color2=tax.colors.includes(item.analysis.color2)?item.analysis.color2:'';
+ item.analysis.style3='';item.analysis.source1=/\bvintage\b/i.test([item.source['Item Name'],item.source['Description/Details']].filter(Boolean).join(' '))?'Vintage (vintage)':'';
+ item.listingStandard=LISTING_STANDARD;item.analysis.title=formatTitle(item.analysis.title);item.description=description(item);item.flags=[...item.analysis.flags,...validate(item,tax)];item.approved=false;item.status='review';item.usage=response.usage;
  await env.DB.prepare('UPDATE items SET data=?,updated=? WHERE sku=?').bind(JSON.stringify(item),Date.now(),sku).run();return json(item);
  } finally { await env.DB.prepare('DELETE FROM analysis_locks WHERE sku=?').bind(sku).run(); }
  }

@@ -18,8 +18,8 @@ export function listingSchema(tax){
   body:{type:'string',description:'2–3 appealing customer-facing sales sentences preserving explicit seller facts. No inventory/photo-verification commentary or manufacturing-year disclaimer; put conflicts in flags.'},
   brand:{type:'string',description:'Actual maker from readable tag or reliable inventory, even if absent from brandOptions. Plain maker name accepted; server resolves against the entire template. Other if unknown.'},
   category:{type:'string',enum:['Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)']},
-  color:{type:'string',enum:tax.colors},age:{type:'string',enum:['',...tax.ages]},
-  style1:{type:'string',enum:tax.styles},style2:{type:'string',enum:tax.styles},size:string,
+  color:{type:'string',enum:tax.colors},color2:{type:'string',enum:['',...tax.colors],description:'Secondary garment color only when a substantial area, such as contrasting cuffs, supports it. Blank otherwise; a multicolor printed graphic alone is not Multi fabric.'},age:{type:'string',enum:['',...tax.ages]},
+  style1:{type:'string',enum:['',...tax.styles]},style2:{type:'string',enum:['',...tax.styles]},size:string,
   tagMissing:{type:'boolean'},sizeVerified:{type:'boolean'},hashtags:{type:'array',minItems:5,maxItems:5,items:string},flags:{type:'array',items:string}
  };
  return {type:'object',properties,required:Object.keys(properties),additionalProperties:false};
