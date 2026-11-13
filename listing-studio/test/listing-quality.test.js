@@ -145,3 +145,23 @@ test('Optional styles can remain blank instead of adding unrelated search terms'
  assert.equal(validate(i,tax).length,0);const row=listingRow(i,tax);
  assert.equal(row['Style 1'],'');assert.equal(row['Style 2'],'');assert.equal(row['Style 3'],'');assert.equal(row['Color 2'],'');
 });
+test('Accepted AJ1045 copy exposes the remaining missing Vintage title and style hashtag',()=>{
+ const i=item();i.source['Item Name']='Vintage Fruit of the Loom SuperCotton Qualatex crewneck, royal blue, perfect vintage sunfade, very heavyweight';
+ i.analysis.title='Fruit of the Loom Qualatex Royal Blue Embossed Crewneck L';
+ i.analysis.body='Royal blue Fruit of the Loom crewneck with an embossed tone on tone Qualatex graphic on the front. Heavyweight feel with natural sunfade throughout and a classic relaxed sweatshirt drape.';
+ i.analysis.hashtags=['qualatex','fruitoftheloom','crewneck','bluecrewneck','vintagestyle'];i.description=description(i);
+ assert.ok(sellerFactErrors(i).some(e=>e.includes('vintage status')));
+ assert.ok(sellerFactErrors(i).some(e=>e.includes('#vintagestyle')));
+ i.analysis.title='Vintage Fruit of the Loom Qualatex Royal Blue Embossed Crewneck L';
+ i.analysis.hashtags[4]='vintagesweatshirt';i.description=description(i);
+ assert.deepEqual(sellerFactErrors(i),[]);
+});
+test('Accepted AJ1055 copy retains its wording but requires seller-confirmed Vintage in title',()=>{
+ const i=item();i.source['Item Name']='Vintage Catholic University light grey crewneck, MV Sport blank';
+ i.analysis.title='Catholic University Light Grey Crewneck MV Sport XL';
+ i.analysis.body='Light grey crewneck with Catholic University graphic on the front and small embroidered patch detail on the sleeve.';
+ i.description=description(i);
+ assert.ok(sellerFactErrors(i).some(e=>e.includes('vintage status')));
+ i.analysis.title='Vintage Catholic University Light Grey Crewneck MV Sport XL';i.description=description(i);
+ assert.deepEqual(sellerFactErrors(i),[]);
+});

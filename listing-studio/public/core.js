@@ -5,7 +5,7 @@ export function parseCSV(text){
  if(cell||row.length){row.push(cell);rows.push(row);}return rows;
 }
 export function inventoryCSV(text){const rows=parseCSV(text.replace(/^\uFEFF/,''));const h=rows.shift();if(!h?.includes('SKU')||!h.includes('Item Name')||!h.includes('RRP'))throw Error('Inventory needs SKU, Item Name and RRP columns.');const seen=new Set();return rows.map(r=>{const v=Object.fromEntries(h.map((k,i)=>[k,r[i]||'']));v.SKU=v.SKU.trim().toUpperCase();if(!/^AJ\d+$/.test(v.SKU)||seen.has(v.SKU))throw Error('Invalid or duplicate SKU: '+v.SKU);seen.add(v.SKU);return v;});}
-export const LISTING_COPY_STANDARD='2026-11-12-seller-facts-v4';
+export const LISTING_COPY_STANDARD='2026-11-12-seller-facts-v5';
 export const SWEATSHIRT_CATEGORY='Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)';
 export function dropdownChoices(values,current,allowBlank=false){
  const unknown=!values.includes(current)&&!(allowBlank&&current==='');
@@ -34,6 +34,9 @@ export function sellerFactErrors(item){
  const body=customerText.slice(title.length).trim();
  const copy=title+' '+body;
  const errors=[];
+ const sellerVintage=/\bvintage\b/i.test(notes)&&!/\bvintage[\s-]+(?:inspired|style|look)\b/i.test(String(source['Item Name']||''));
+ if(sellerVintage&&!/\bvintage\b/i.test(title))errors.push('Seller-described vintage status is missing from the title.');
+ if(sellerVintage&&/#vintage(?:style|inspired)\b/i.test(rendered))errors.push('Use an actual vintage item hashtag instead of #vintagestyle or #vintageinspired.');
  const datedVintage=notes.match(/\bvintage\s+(19[5-9]\d|200\d)\b/i);
  if(datedVintage&&!new RegExp('\\b'+datedVintage[1]+'\\b').test(title))errors.push('Seller-confirmed vintage year '+datedVintage[1]+' is missing from the title.');
  const sourceYears=[...new Set([...String(source['Item Name']||'').matchAll(/\b(?:19[5-9]\d|20[0-2]\d)\b/g)].map(m=>m[0]))];
