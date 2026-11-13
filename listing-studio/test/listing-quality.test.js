@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {resolveBrand,listingSchema,LISTING_STANDARD} from '../src/listing-quality.js';
-import {exportAttributes,listingRow,validate,importItem,description} from '../public/core.js';
+import {exportAttributes,listingRow,validate,importItem,description,dropdownChoices,inventoryEra,exportCSV,SWEATSHIRT_CATEGORY} from '../public/core.js';
 import worker from '../src/worker.js';
 const tax=JSON.parse(await readFile(new URL('../public/taxonomy.json',import.meta.url)));
 test('A maker outside the prompt shortlist resolves against the complete template',()=>{
@@ -51,3 +51,32 @@ test('Exported listing replacement is blocked before any paid API call',async()=
 });
 
 test('Unreadable size labels are distinguished from missing tags and verified sizes',()=>{const i=item();i.analysis.tagMissing=false;i.analysis.sizeVerified=false;assert.match(description(i),/Size: S \(seller provided; tag size unverified\)/);i.analysis.sizeVerified=true;assert.match(description(i),/Tagged size: S/);i.analysis.tagMissing=true;assert.match(description(i),/Size: S \(tag missing\)/);});
+
+test('Unknown dropdown values remain explicitly invalid instead of falling back to Collectibles',()=>{
+ const options=dropdownChoices(tax.categories,'Men >> Tops >> Sweatshirts');
+ assert.equal(options.filter(o=>o.selected).length,1);assert.equal(options[0].value,'__invalid__');assert.equal(options[0].disabled,true);
+ assert.equal(options.find(o=>o.value===tax.categories[0]).selected,false);
+ const optional=dropdownChoices(tax.ages,'invalid era',true);assert.equal(optional[0].value,'__invalid__');assert.ok(optional.some(o=>o.value===''&&!o.disabled));
+ assert.equal(dropdownChoices(tax.categories,SWEATSHIRT_CATEGORY).find(o=>o.selected).value,SWEATSHIRT_CATEGORY);
+});
+test('A valid but unrelated category blocks approval and CSV export for crewneck inventory',()=>{
+ const i=item();i.source.Category='Crewneck';i.approved=true;i.analysis.category=tax.categories[0];
+ assert.ok(validate(i,tax).some(e=>e.includes('Crewneck category must')));assert.throws(()=>exportCSV([i],tax),/Crewneck category must/);
+ delete i.source.Category;assert.ok(validate(i,tax).some(e=>e.includes('Crewneck category must')));i.analysis.category=SWEATSHIRT_CATEGORY;assert.equal(validate(i,tax).length,0);
+});
+test('Explicit vintage dating is checked without treating an event year as manufacture proof',()=>{
+ assert.equal(inventoryEra({'Item Name':'Vintage 1985 crewneck red'}),'80s (80s)');
+ assert.equal(inventoryEra({'Item Name':'Atlanta 1996 Olympics Vintage Champion crewneck'}),'');
+ assert.equal(inventoryEra({'Item Name':'HOYAS 80s crewneck'}),'80s (80s)');
+ const i=item();i.approved=true;i.analysis.age='90s (90s)';assert.throws(()=>exportCSV([i],tax),/Age conflicts with inventory: 80s/);
+ i.analysis.age='80s (80s)';assert.equal(validate(i,tax).length,0);i.analysis.age='';assert.equal(validate(i,tax).length,0);
+});
+test('New generation schema permits unknown age instead of forcing a decade',()=>{assert.ok(listingSchema(tax).properties.age.enum.includes(''));});
+test('Server rejects approval writes with a valid but wrong category or contradictory age',async()=>{
+ for(const field of ['category','age']){
+  const i=item();i.source.Category='Crewneck';i.approved=true;if(field==='category')i.analysis.category=tax.categories[0];else i.analysis.age='90s (90s)';
+  let writes=0;const env={ADMIN_TOKEN:'test',DB:{prepare:()=>{writes++;throw Error('Must not write');}},ASSETS:{fetch:async()=>Response.json(tax)}};
+  const response=await worker.fetch(new Request('https://studio.example/api/items/AJ1060',{method:'PUT',headers:{Authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify(i)}),env);
+  assert.equal(response.status,422);assert.match((await response.json()).error,/Cannot approve/);assert.equal(writes,0);
+ }
+});

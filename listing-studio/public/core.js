@@ -5,6 +5,23 @@ export function parseCSV(text){
  if(cell||row.length){row.push(cell);rows.push(row);}return rows;
 }
 export function inventoryCSV(text){const rows=parseCSV(text.replace(/^\uFEFF/,''));const h=rows.shift();if(!h?.includes('SKU')||!h.includes('Item Name')||!h.includes('RRP'))throw Error('Inventory needs SKU, Item Name and RRP columns.');const seen=new Set();return rows.map(r=>{const v=Object.fromEntries(h.map((k,i)=>[k,r[i]||'']));v.SKU=v.SKU.trim().toUpperCase();if(!/^AJ\d+$/.test(v.SKU)||seen.has(v.SKU))throw Error('Invalid or duplicate SKU: '+v.SKU);seen.add(v.SKU);return v;});}
+export const SWEATSHIRT_CATEGORY='Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)';
+export function dropdownChoices(values,current,allowBlank=false){
+ const unknown=!values.includes(current)&&!(allowBlank&&current==='');
+ return [...(unknown?[{value:'__invalid__',text:`Choose a valid value (saved: ${current||'missing'})`,selected:true,disabled:true}]:[]),...(allowBlank?[{value:'',text:'Not specified',selected:current==='',disabled:false}]:[]),...values.map(value=>({value,text:label(value),selected:value===current,disabled:false}))];
+}
+export function inventoryEra(source={}){
+ const notes=[source['Era'],source['Age'],source['Item Name'],source['Description/Details']].filter(Boolean).join(' ');
+ const decades=[...notes.matchAll(/\b(50|60|70|80|90|00)['’]?s\b/gi)].map(m=>m[1]);
+ for(const m of notes.matchAll(/\bvintage\s+(19[5-9]\d|200\d)\b/gi))decades.push(m[1].slice(2,3)+'0');
+ const unique=[...new Set(decades)];return unique.length===1?unique[0]==='00'?'00s (y2k)':unique[0]+'s ('+unique[0]+'s)':'';
+}
+export function attributeErrors(item,tax){
+ const a=item.analysis;if(!a)return [];const errors=[];
+ if(a.category!==SWEATSHIRT_CATEGORY)errors.push('Crewneck category must be Men > Tops > Sweatshirts for this studio.');
+ const era=inventoryEra(item.source);if(era&&a.age&&a.age!==era)errors.push('Age conflicts with inventory: '+label(era)+'. Verify the date; select that era or leave age unspecified if dating is uncertain.');
+ return errors;
+}
 export const label=v=>(v||'').replace(/ \([^)]*\)$/,'');
 // Presentation cleanup only. Never add eras, brands or other SEO claims here.
 const titleAcronyms=new Set(['USA','US','UK','NYC','LA','NFL','NBA','MLB','NHL','NCAA','NASCAR','HBCU','Y2K','ACG','DKNY','DMX','WWF','WWE','BMW','ATV','WIP','MTV','DC','2XL','3XL','4XL','XS','XXS','XL','XXL','XXXL']);
@@ -39,7 +56,7 @@ export function nextReviewSKU(list,currentSKU,selection=[]){
  return ordered.find(i=>i.sku!==currentSKU&&i.analysis&&!i.approved&&i.status!=='exported')?.sku||null;
 }
 export function description(item){const a=item.analysis;if(!a)return '';return [a.title,a.body,(a.tagMissing||a.sizeVerified===false?'Size: ':'Tagged size: ')+a.size+(a.tagMissing?' (tag missing)':a.sizeVerified===false?' (seller provided; tag size unverified)':''),'Shipping: FREE','Please message us for the exact measurements.','Open to offers!','~AtlantaJake',a.hashtags.map(x=>'#'+x.replace(/^#/, '')).join(' '),item.sku].join('\n\n');}
-export function validate(item,tax){const a=item.analysis;const e=[];if(!a)return ['Analysis required'];if(!item.photos?.length)e.push('Photos missing');if(item.photos?.some(p=>!p.url?.startsWith('https://')))e.push('Upload photos before export');const d=item.description||description(item);if(!a.title?.trim())e.push('Title required');if(d.length>1000)e.push('Description exceeds 1,000 characters');const tags=d.match(/#[\w]+/g)||[];if(tags.length!==5)e.push('Use exactly five hashtags');else if(new Set(tags.map(t=>t.toLowerCase())).size!==5)e.push('Use five distinct hashtags');if(/\b(featuring|quirky|edgy)\b|[-–—]/i.test(d))e.push('Description contains prohibited wording or dashes');if(!Number.isFinite(Number(item.price))||Number(item.price)<=0)e.push('Price required');for(const [k,list] of [['brand','brands'],['category','categories'],['color','colors'],['age','ages'],['style1','styles'],['style2','styles']])if(!(k==='age'&&a[k]==='')&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!['S','M','L','XL','XXL','XS','XXS','3XL','4XL','One size'].includes(a.size))e.push('Check crewneck size');for(const [k,list] of [['color2','colors'],['source1','sources'],['style3','styles']])if(a[k]!==undefined&&a[k]!==''&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!tax.conditions.includes(item.condition))e.push('Condition required');return e;}
+export function validate(item,tax){const a=item.analysis;const e=[];if(!a)return ['Analysis required'];if(!item.photos?.length)e.push('Photos missing');if(item.photos?.some(p=>!p.url?.startsWith('https://')))e.push('Upload photos before export');const d=item.description||description(item);if(!a.title?.trim())e.push('Title required');if(d.length>1000)e.push('Description exceeds 1,000 characters');const tags=d.match(/#[\w]+/g)||[];if(tags.length!==5)e.push('Use exactly five hashtags');else if(new Set(tags.map(t=>t.toLowerCase())).size!==5)e.push('Use five distinct hashtags');if(/\b(featuring|quirky|edgy)\b|[-–—]/i.test(d))e.push('Description contains prohibited wording or dashes');if(!Number.isFinite(Number(item.price))||Number(item.price)<=0)e.push('Price required');for(const [k,list] of [['brand','brands'],['category','categories'],['color','colors'],['age','ages'],['style1','styles'],['style2','styles']])if(!(k==='age'&&a[k]==='')&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!['S','M','L','XL','XXL','XS','XXS','3XL','4XL','One size'].includes(a.size))e.push('Check crewneck size');for(const [k,list] of [['color2','colors'],['source1','sources'],['style3','styles']])if(a[k]!==undefined&&a[k]!==''&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!tax.conditions.includes(item.condition))e.push('Condition required');e.push(...attributeErrors(item,tax));return e;}
 export function photoDeliveryURL(photo,origin){
  if(!origin||photo.provider!=='drive')return photo.url;
  const current=new URL(photo.url),target=new URL(origin);
