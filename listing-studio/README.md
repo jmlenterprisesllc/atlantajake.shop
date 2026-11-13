@@ -45,7 +45,7 @@ Validate against AJ1028–AJ1032 first: Woody Woodpecker identity, Tultex August
 
 - RRP × 1.25. A later 25% discount results in 93.75% of RRP.
 - A → Used Excellent; AB → Used Good; B → Used Fair.
-- Domestic shipping 0; international 25; United States.
+- The template version 6 CSV contains numeric domestic shipping price 0 and international shipping price 25, but no Depop parcel-size field. The domestic 0 does not select a Depop Shipping label, make a Small label, or apply a free-shipping discount. For crewnecks within the Small packed-weight limit, choose Small on Depop after import. Set the iOS Shipping Discount to Free when the buyer should receive the promised free shipping. Verify the actual listing checkout before processing a large batch. Existing published listings must be edited in Depop.
 - Color 2 Multi; source Vintage / Preloved; missing era 90s, flagged unverified; Style 3 Y2K. Explicit supported eras preserved.
 - Named true manufacturers only, Other when unknown; never generic American Vintage tagging.
 - Exact blank-line format, five lowercase hashtags, SKU last, no Instagram promotion, no featuring/quirky/edgy/dashes, 1,000-character maximum.

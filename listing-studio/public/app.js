@@ -76,8 +76,8 @@ $('export').onclick=async()=>{
  if(exportURL)URL.revokeObjectURL(exportURL);
  exportURL=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
  const link=document.createElement('a');link.href=exportURL;link.download='AtlantaJake_Depop_'+new Date().toISOString().slice(0,10)+'.csv';link.textContent='Download CSV ('+chosen.length+' '+(chosen.length===1?'listing':'listings')+')';link.className='button secondary';
- exportFeedback.replaceChildren(link,document.createTextNode(' Your CSV is ready. If the download did not start, click Download CSV. You can download this selection again.'));
- link.click();notice('CSV ready for '+chosen.length+' listings. Use the Download CSV link under Export approved selection.');
+ exportFeedback.replaceChildren(link,document.createTextNode(' Your CSV is ready. If the download did not start, click Download CSV. After importing, set the Depop parcel size to Small for crewnecks that fit, and set the iOS Shipping Discount to Free if the description promises free shipping. The CSV does not set either option.'));
+ link.click();notice('CSV ready for '+chosen.length+' listings. Set the Depop label size and any Free shipping discount before posting.');
  const saveErrors=[];
  for(const i of chosen){const draft={...i,status:'exported'};try{await persist(draft);items.set(i.sku,draft);}catch(e){saveErrors.push(i.sku);}}
  render();
