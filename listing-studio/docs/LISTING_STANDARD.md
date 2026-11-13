@@ -59,7 +59,8 @@ The earlier AJ1060 title failed because it flattened the record into a generic p
 - The previously requested Multi / Vintage / Y2K defaults are retained as initial values for compatibility, with a visible warning. They are not endorsed as universal SEO choices. Recommendation: use only where relevant and remove unsupported defaults per item. Changing the shop-wide policy should be an explicit decision.
 - Older cached drafts are marked. Deployment does not rewrite their copy. Normal Analyze clicks still return cached results without another paid call.
 - An explicit single-item **Generate replacement draft (uses API credits)** action replaces copy/analysis and clears approval after success. Failure retains the saved draft. Exported items cannot be replaced through this action. It uses the existing configured model; the output allowance is increased from 1,800 to 2,600 tokens to accommodate evidence. No second automatic review call was added.
-- Price formulas, shipping settings and photographic delivery are unchanged. This release does not compare every item with sold-market prices.
+- All CSV exports use the template’s exact city-level value `Atlanta, United States` (Atlanta, GA), including re-exports of saved approved items. Inventory storage notes do not override the shipping origin. Already imported Depop drafts/listings are not updated automatically.
+- Price formulas, shipping charges and photographic delivery are unchanged. This release does not compare every item with sold-market prices.
 
 ## Release gate before scaling
 
