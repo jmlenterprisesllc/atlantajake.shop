@@ -121,3 +121,15 @@ export function exportAttributes(a){return {color2:a.color2??'Multi (multi)',sou
 export function listingRow(item,tax,photoOrigin){const a=item.analysis,copy=item.description||description(item),exportDescription=copy.replace(/^[^\r\n]*/,formatTitle(copy.split(/\r?\n/)[0]));return Object.fromEntries(tax.headers.map(h=>[h,({'Description':exportDescription,'Category':a.category,'Price':item.price,'Brand':a.brand,'Condition':item.condition,'Size':a.size,'Color 1':a.color,'Color 2':exportAttributes(a).color2,'Source 1':exportAttributes(a).source1,'Source 2':'Preloved (preloved)','Age':a.age,'Style 1':a.style1,'Style 2':a.style2,'Style 3':exportAttributes(a).style3,'Location':'Atlanta, United States','Domestic Shipping price':'0','International Shipping price':'25','SKU':item.sku,...Object.fromEntries((item.photos||[]).map((p,i)=>[i===0?'Picture Hero url':`Picture ${i+1} url`,photoDeliveryURL(p,photoOrigin)]))})[h]??'']));}
 export function exportCSV(items,tax,photoOrigin){if(!items.length||items.length>100)throw Error('Export 1–100 listings at a time.');for(const i of items){const e=validate(i,tax);if(e.length||!i.approved)throw Error(i.sku+': '+(e.join('; ')||'Review and approve first'));}const records=[['Template version: 6',...Array(25).fill('')],tax.headers,tax.instructions,...items.map(i=>{const r=listingRow(i,tax,photoOrigin);return tax.headers.map(h=>r[h]);})];return records.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\r\n');}
 export function importItem(source){const price=Number(source.RRP.replace(/[^\d.]/g,''));return {sku:source.SKU,source,price:price>0?(Math.round(price*125)/100).toFixed(2):'',condition:({'A':'Used - Excellent (used_excellent)','AB':'Used - Good (used_good)','B':'Used - Fair (used_fair)'})[source.Condition]||'',photos:[],approved:false,status:'new'};}
+export function mergeInventorySource(existing,source){
+ if(!existing)return {item:importItem(source),change:'created'};
+ if(existing.status==='exported')return {item:existing,change:'exported'};
+ const equal=(a,b)=>JSON.stringify(Object.entries(a).sort(([x],[y])=>x.localeCompare(y)))===JSON.stringify(Object.entries(b).sort(([x],[y])=>x.localeCompare(y)));
+ if(equal(existing.source,source))return {item:existing,change:'unchanged'};
+ const oldDefaults=importItem(existing.source),newDefaults=importItem(source),item=structuredClone(existing);
+ item.source=source;
+ if(item.price===oldDefaults.price)item.price=newDefaults.price;
+ if(item.condition===oldDefaults.condition)item.condition=newDefaults.condition;
+ item.approved=false;item.error='';item.status='inventory changed';
+ return {item,change:'updated'};
+}

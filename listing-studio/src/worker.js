@@ -1,6 +1,6 @@
 import {driveReady,skuFolders,drivePhotos,photoResponse} from './drive.js';
 import {authorised,session,sessionCookie,logoutCookie,loginPage,correctPassword} from './auth.js';
-import {description,validate,completeGeneratedTitle,sellerTitleFacts} from '../public/core.js';
+import {description,validate,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource} from '../public/core.js';
 import {LISTING_INSTRUCTIONS} from './listing-prompt.js';
 import {LISTING_STANDARD,listingSchema,resolveBrand} from './listing-quality.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -37,6 +37,18 @@ export default {async fetch(req,env){
  if(path==='/api/status')return json({storage:!!env.PHOTOS,database:!!env.DB,analysis:!!env.OPENAI_API_KEY&&!!env.OPENAI_MODEL,inventory:!!env.INVENTORY_CSV_URL,drive:driveReady(env)});
  if(path==='/api/inventory'){if(!env.INVENTORY_CSV_URL)return json({error:'Inventory connection not configured. Import an inventory CSV instead.'},503);const r=await fetch(env.INVENTORY_CSV_URL);if(!r.ok)return json({error:'Inventory sheet is unavailable. Import its CSV instead.'},502);return new Response(await r.text(),{headers:{'Content-Type':'text/csv','Cache-Control':'no-store'}});}
  if(!env.DB)return json({error:'Database setup required.'},503);
+ if(path==='/api/inventory/import'&&req.method==='POST'){
+ if(Number(req.headers.get('Content-Length')||0)>1000000)return json({error:'Inventory batch is too large.'},413);
+ const {sources}=await req.json();
+ if(!Array.isArray(sources)||sources.length<1||sources.length>100||new Set(sources.map(s=>s?.SKU)).size!==sources.length||sources.some(s=>!s||!skuOK(s.SKU)||typeof s['Item Name']!=='string'||typeof s.RRP!=='string'||JSON.stringify(s).length>20000))return json({error:'Invalid inventory batch.'},400);
+ const skus=sources.map(s=>s.SKU);
+ const records=await env.DB.prepare('SELECT data FROM items WHERE sku IN ('+skus.map(()=>'?').join(',')+')').bind(...skus).all();
+ const saved=new Map(records.results.map(row=>{const item=JSON.parse(row.data);return [item.sku,item];}));
+ const changes=[],items=[],stats={created:0,updated:0,unchanged:0,exported:0};
+ for(const source of sources){const result=mergeInventorySource(saved.get(source.SKU),source);stats[result.change]++;items.push(result.item);if(result.change==='created'||result.change==='updated')changes.push(env.DB.prepare('INSERT INTO items(sku,data,updated) VALUES(?,?,?) ON CONFLICT(sku) DO UPDATE SET data=excluded.data,updated=excluded.updated').bind(source.SKU,JSON.stringify(result.item),Date.now()));}
+ if(changes.length)await env.DB.batch(changes);
+ return json({items,stats});
+ }
  if(path==='/api/drive/folders'&&req.method==='GET'){if(!driveReady(env))return json({error:'Connect the studio Drive service account first.'},503);return json(await skuFolders(env));}
  if(path==='/api/drive/import'&&req.method==='POST'){
  if(!driveReady(env))return json({error:'Drive connection not configured.'},503);

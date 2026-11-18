@@ -4,14 +4,14 @@ A separate, account-ready pilot for the owner's listing workflow. The public sto
 
 ## What works
 
-- Master inventory CSV import (SKU, Item Name, RRP; other columns retained as factual source).
+- Master inventory CSV import (SKU, Item Name, RRP; other columns retained as factual source). Import saves the inventory to D1 in batches and it loads automatically at the next sign-in. Upload a newer CSV whenever the master sheet changes.
 - Optional server-configured Google Sheets CSV refresh. This is read-only; there is no sheet writeback.
 - Parent-folder selection with SKU matching and natural filename order. Rejects more than eight pictures per item rather than silently discarding pictures. Supports JPEG, PNG and WebP; convert HEIC first.
 - Browser-local 2,000px JPEG copies at quality 0.86. Original files are never modified.
 - Three concurrent photo uploads per item, checksum-based deduplication, three upload attempts, selectable cover image.
 - Server-side OpenAI Responses image analysis with structured output, explicit uncertainty flags, and store rules. Cached analysis and a database lease guard duplicate paid calls. No automatic paid-call retry.
 - Editable description, brand, category, size, color, age, styles, condition, price; explicit approval required before export.
-- D1 records survive sessions after connection and processing; public image links are served from R2 through the Worker. No credentials or private inventory are checked into GitHub.
+- D1 inventory and listing records survive sessions; public image links are served through the Worker. No credentials or private inventory are checked into GitHub. Reimporting unchanged rows is safe. Changed rows keep photos and existing generated copy, clear approval and require review; exported listings are preserved.
 - Template version 6 CSV export, maximum 100 approved items per file. Exported items are excluded from subsequent exports. Export is not proof of Depop import or publication.
 
 ## Recommended setup
@@ -37,7 +37,7 @@ For local testing, use a local `.dev.vars` file (ignored by Git) for secrets, ru
 
 ## Pilot workflow
 
-Import the current master inventory CSV, select SKU range, then select the parent photo folder. Use Upload & analyze selected. Keep the browser tab open while this pilot processes items sequentially; it does not yet run a durable background queue. If interrupted, reconnect, reselect folders for incomplete items and resume. Review/approve completed items before exports. Check file import results in Depop before marking anything listed elsewhere.
+Import the current master inventory CSV once to populate D1, select a SKU range, then load photos from Drive. Subsequent sign-ins load saved inventory automatically. An updated CSV adds new SKUs and refreshes changed rows; removed CSV rows are retained in the studio, and exported listings are never rewritten. If a large import is interrupted, upload the same file to resume without duplicating unchanged rows. Keep the browser tab open while analysis processes items sequentially; it does not yet run a durable background queue. Review/approve completed items before exports. Check file import results in Depop before marking anything listed elsewhere.
 
 Validate against AJ1028–AJ1032 first: Woody Woodpecker identity, Tultex Augusta label and trim, Olympic embroidery, cut Hoyas collar, Earl Small's sleeve graphic and front mark. These private source photos are not included in this public repository.
 
