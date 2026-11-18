@@ -1,6 +1,6 @@
 import {driveReady,skuFolders,drivePhotos,photoResponse} from './drive.js';
 import {authorised,session,sessionCookie,logoutCookie,loginPage,correctPassword} from './auth.js';
-import {description,validate,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource,excludedFromBatch} from '../public/core.js';
+import {description,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource,excludedFromBatch} from '../public/core.js';
 import {LISTING_INSTRUCTIONS} from './listing-prompt.js';
 import {LISTING_STANDARD,listingSchema,resolveBrand} from './listing-quality.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -62,7 +62,7 @@ export default {async fetch(req,env){
  }
  if(path==='/api/items'&&req.method==='GET'){const r=await env.DB.prepare('SELECT data FROM items ORDER BY sku').all();return json(r.results.map(r=>JSON.parse(r.data)));}
  const m=path.match(/^\/api\/items\/(AJ\d+)$/);
- if(m&&req.method==='PUT'){if(Number(req.headers.get('Content-Length')||0)>1000000)return json({error:'Item too large'},413);const data=await req.json();if(data.sku!==m[1]||JSON.stringify(data).length>1000000||data.photos?.length>8)return json({error:'Invalid item'},400);if(data.approved){const tax=await (await env.ASSETS.fetch(new Request(u.origin+'/taxonomy.json'))).json();const errors=validate(data,tax);if(errors.length)return json({error:'Cannot approve: '+errors.join('; ')},422);}await env.DB.prepare('INSERT INTO items(sku,data,updated) VALUES(?,?,?) ON CONFLICT(sku) DO UPDATE SET data=excluded.data,updated=excluded.updated').bind(m[1],JSON.stringify(data),Date.now()).run();return json({saved:true});}
+ if(m&&req.method==='PUT'){if(Number(req.headers.get('Content-Length')||0)>1000000)return json({error:'Item too large'},413);const data=await req.json();if(data.sku!==m[1]||JSON.stringify(data).length>1000000||data.photos?.length>8)return json({error:'Invalid item'},400);if(data.approved&&(!data.analysis||excludedFromBatch(data)))return json({error:'Generate a draft and restore this item to the batch before approving.'},422);await env.DB.prepare('INSERT INTO items(sku,data,updated) VALUES(?,?,?) ON CONFLICT(sku) DO UPDATE SET data=excluded.data,updated=excluded.updated').bind(m[1],JSON.stringify(data),Date.now()).run();return json({saved:true});}
  const upload=path.match(/^\/api\/upload\/(AJ\d+)\/([a-f0-9]{64})$/);
  if(upload&&['PUT','HEAD'].includes(req.method)){if(!env.PHOTOS)return json({error:'Mac uploads are disabled; import photos from Drive.'},503);const key=upload[1]+'/'+upload[2]+'.jpg';const url=u.origin+'/photos/'+key;
  if(req.method==='HEAD')return new Response(null,{status:await env.PHOTOS.head(key)?200:404});

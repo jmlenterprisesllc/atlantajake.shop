@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {resolveBrand,listingSchema,LISTING_STANDARD} from '../src/listing-quality.js';
-import {exportAttributes,listingRow,validate,importItem,description,dropdownChoices,inventoryEra,exportCSV,SWEATSHIRT_CATEGORY,sellerFactErrors,reviewDraft,completeGeneratedTitle,previewSellerTitle,sellerTitleFacts} from '../public/core.js';
+import {exportAttributes,listingRow,validate,importItem,description,exportErrors,reviewSuggestions,dropdownChoices,inventoryEra,exportCSV,SWEATSHIRT_CATEGORY,sellerFactErrors,reviewDraft,completeGeneratedTitle,previewSellerTitle,sellerTitleFacts} from '../public/core.js';
 import worker from '../src/worker.js';
 const tax=JSON.parse(await readFile(new URL('../public/taxonomy.json',import.meta.url)));
 test('A maker outside the prompt shortlist resolves against the complete template',()=>{
@@ -88,42 +88,42 @@ test('Unknown dropdown values remain explicitly invalid instead of falling back 
  const optional=dropdownChoices(tax.ages,'invalid era',true);assert.equal(optional[0].value,'__invalid__');assert.ok(optional.some(o=>o.value===''&&!o.disabled));
  assert.equal(dropdownChoices(tax.categories,SWEATSHIRT_CATEGORY).find(o=>o.selected).value,SWEATSHIRT_CATEGORY);
 });
-test('A valid but unrelated category blocks approval and CSV export for crewneck inventory',()=>{
+test('A valid but unrelated category remains a review suggestion after owner approval',()=>{
  const i=item();i.source.Category='Crewneck';i.approved=true;i.analysis.category=tax.categories[0];
- assert.ok(validate(i,tax).some(e=>e.includes('Crewneck category must')));assert.throws(()=>exportCSV([i],tax),/Crewneck category must/);
+ assert.ok(validate(i,tax).some(e=>e.includes('Crewneck category must')));assert.doesNotThrow(()=>exportCSV([i],tax));
  delete i.source.Category;assert.ok(validate(i,tax).some(e=>e.includes('Crewneck category must')));i.analysis.category=SWEATSHIRT_CATEGORY;assert.equal(validate(i,tax).length,0);
 });
 test('Explicit vintage dating is checked without treating an event year as manufacture proof',()=>{
  assert.equal(inventoryEra({'Item Name':'Vintage 1985 crewneck red'}),'80s (80s)');
  assert.equal(inventoryEra({'Item Name':'Atlanta 1996 Olympics Vintage Champion crewneck'}),'');
  assert.equal(inventoryEra({'Item Name':'HOYAS 80s crewneck'}),'80s (80s)');
- const i=item();i.approved=true;i.analysis.age='90s (90s)';assert.throws(()=>exportCSV([i],tax),/Age conflicts with inventory: 80s/);
+ const i=item();i.approved=true;i.analysis.age='90s (90s)';assert.ok(reviewSuggestions(i,tax).some(e=>e.includes('Age conflicts')));assert.doesNotThrow(()=>exportCSV([i],tax));
  i.analysis.age='80s (80s)';assert.equal(validate(i,tax).length,0);i.analysis.age='';assert.equal(validate(i,tax).length,0);
 });
 test('New generation schema permits unknown age instead of forcing a decade',()=>{assert.ok(listingSchema(tax).properties.age.enum.includes(''));});
-test('Server rejects approval writes with a valid but wrong category or contradictory age',async()=>{
+test('Server saves owner approval despite category or age review suggestions',async()=>{
  for(const field of ['category','age']){
   const i=item();i.source.Category='Crewneck';i.approved=true;if(field==='category')i.analysis.category=tax.categories[0];else i.analysis.age='90s (90s)';
-  let writes=0;const env={ADMIN_TOKEN:'test',DB:{prepare:()=>{writes++;throw Error('Must not write');}},ASSETS:{fetch:async()=>Response.json(tax)}};
+  let writes=0;const env={ADMIN_TOKEN:'test',DB:{prepare:()=>({bind:()=>({run:async()=>{writes++;}})})},ASSETS:{fetch:async()=>Response.json(tax)}};
   const response=await worker.fetch(new Request('https://studio.example/api/items/AJ1060',{method:'PUT',headers:{Authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify(i)}),env);
-  assert.equal(response.status,422);assert.match((await response.json()).error,/Cannot approve/);assert.equal(writes,0);
+  assert.equal(response.status,200);assert.equal((await response.json()).saved,true);assert.equal(writes,1);
  }
 });
 
-test('Internal verification commentary cannot be approved or exported as sales copy',()=>{
+test('Internal verification commentary is flagged for the owner to review',()=>{
  const i=item();i.approved=true;i.analysis.body='Inventory lists size S, but no readable neck tag is shown. The size is unverified.';
- assert.throws(()=>exportCSV([i],tax),/Move internal verification commentary/);
+ assert.ok(reviewSuggestions(i,tax).some(e=>e.includes('internal verification')));assert.doesNotThrow(()=>exportCSV([i],tax));
  i.analysis.body='Super soft red fabric with a bold 20 graphic and Rah Rah lettering.';
  assert.equal(validate(i,tax).length,0);assert.ok(!description(i).includes('unverified'));
 });
-test('The actual AJ1060 failure cannot pass: seller year, number, feel and internal disclaimers',()=>{
+test('The actual AJ1060 failure still receives suggestions for seller facts and internal disclaimers',()=>{
  const i=item();i.approved=true;
  i.analysis.title='Rah Rah Red 20 Graphic Crewneck Sweatshirt';
  i.analysis.body='Bright red crewneck with a 20 graphic. The copyright print appears to be design or copyright text rather than confirmed manufacturing year.';
  i.description=description(i);
  assert.ok(sellerFactErrors(i).some(e=>e.includes('1985')));
  assert.ok(sellerFactErrors(i).some(e=>e.includes('soft')));
- assert.throws(()=>exportCSV([i],tax),/Seller-confirmed vintage year 1985/);
+ assert.doesNotThrow(()=>exportCSV([i],tax));
  assert.ok(validate(i,tax).some(e=>e.includes('internal verification')));
  i.analysis.title='Vintage 1985 Rah Rah Red Graphic Crewneck Sweatshirt';
  i.analysis.body='Super soft red fabric with Rah Rah lettering and a graphic on the front.';
@@ -195,4 +195,14 @@ test('Accepted AJ1055 copy retains its wording but requires seller-confirmed Vin
  assert.ok(sellerFactErrors(i).some(e=>e.includes('vintage status')));
  i.analysis.title='Vintage Catholic University Light Grey Crewneck MV Sport XL';i.description=description(i);
  assert.deepEqual(sellerFactErrors(i),[]);
+});
+
+test('CSV still requires usable photos, valid fields and a description within the limit',()=>{
+ for(const change of [i=>i.photos=[],i=>i.price='0',i=>i.analysis.category='__invalid__',i=>i.description='x'.repeat(1001)]){
+ const i=item();i.approved=true;change(i);assert.ok(exportErrors(i,tax).length);assert.throws(()=>exportCSV([i],tax));
+ }
+});
+test('No tag disclosure after the size line satisfies the seller fact suggestion',()=>{
+ const i=item();i.source['Item Name']='Mickey Mouse crewneck, no tag';i.description=description(i).replace('Please message','No tag. Please message');
+ assert.ok(!sellerFactErrors(i).some(e=>e.includes('missing tag')));
 });
