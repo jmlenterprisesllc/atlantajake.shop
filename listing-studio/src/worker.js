@@ -1,6 +1,6 @@
 import {driveReady,skuFolders,drivePhotos,photoResponse} from './drive.js';
 import {authorised,session,sessionCookie,logoutCookie,loginPage,correctPassword} from './auth.js';
-import {description,validate,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource} from '../public/core.js';
+import {description,validate,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource,excludedFromBatch} from '../public/core.js';
 import {LISTING_INSTRUCTIONS} from './listing-prompt.js';
 import {LISTING_STANDARD,listingSchema,resolveBrand} from './listing-quality.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -44,7 +44,7 @@ export default {async fetch(req,env){
  const skus=sources.map(s=>s.SKU);
  const records=await env.DB.prepare('SELECT data FROM items WHERE sku IN ('+skus.map(()=>'?').join(',')+')').bind(...skus).all();
  const saved=new Map(records.results.map(row=>{const item=JSON.parse(row.data);return [item.sku,item];}));
- const changes=[],items=[],stats={created:0,updated:0,unchanged:0,exported:0};
+ const changes=[],items=[],stats={created:0,updated:0,unchanged:0,exported:0,excluded:0};
  for(const source of sources){const result=mergeInventorySource(saved.get(source.SKU),source);stats[result.change]++;items.push(result.item);if(result.change==='created'||result.change==='updated')changes.push(env.DB.prepare('INSERT INTO items(sku,data,updated) VALUES(?,?,?) ON CONFLICT(sku) DO UPDATE SET data=excluded.data,updated=excluded.updated').bind(source.SKU,JSON.stringify(result.item),Date.now()));}
  if(changes.length)await env.DB.batch(changes);
  return json({items,stats});
@@ -54,7 +54,7 @@ export default {async fetch(req,env){
  if(!driveReady(env))return json({error:'Drive connection not configured.'},503);
  const {sku,folderId}=await req.json();if(!skuOK(sku))return json({error:'Invalid SKU'},400);
  const row=await env.DB.prepare('SELECT data FROM items WHERE sku=?').bind(sku).first();if(!row)return json({error:'Import inventory for this SKU first.'},400);
- const item=JSON.parse(row.data);if(item.status==='exported')return json({error:'Already exported; review import results before replacing photos.'},409);
+ const item=JSON.parse(row.data);if(item.status==='exported'||excludedFromBatch(item))return json({error:'This item is exported, skipped or sold. Restore it before loading photos.'},409);
  const photos=await drivePhotos(env,sku,folderId,u.origin);
  const same=JSON.stringify(item.photos?.map(p=>[p.fileId,p.checksum,p.modifiedTime]))===JSON.stringify(photos.map(p=>[p.fileId,p.checksum,p.modifiedTime]));
  if(!same){item.photos=photos;item.analysis=null;item.description='';item.approved=false;item.status='photos ready';item.error='';}
@@ -73,6 +73,7 @@ export default {async fetch(req,env){
  if(!env.OPENAI_API_KEY||!env.OPENAI_MODEL)return json({error:'Connect an OpenAI API key and model before analysis.'},503);
  const {sku,replace=false}=await req.json();if(!skuOK(sku))return json({error:'Invalid SKU'},400);
  const record=await env.DB.prepare('SELECT data FROM items WHERE sku=?').bind(sku).first();if(!record)return json({error:'Item not found'},404);const item=JSON.parse(record.data);
+ if(excludedFromBatch(item))return json({error:'This item is skipped or sold. Restore it before analysis.'},409);
  if(item.analysis&&!replace)return json(item); // Repeated batch clicks must not create repeat charges.
  if(replace&&item.status==='exported')return json({error:'Exported listings are retained. Review existing exports before replacing a draft.'},409);
  if(!item.photos?.length||item.photos.length>8||item.photos.some(p=>p.provider==='drive'?(!driveReady(env)||!p.fileId||!p.folderId):!new RegExp('^'+sku+'/[a-f0-9]{64}\\.jpg$').test(p.key)))return json({error:'Upload 1–8 matching photos first'},400);

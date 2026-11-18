@@ -106,10 +106,30 @@ export function coverDraft(item,index){
 export function nextReviewSKU(list,currentSKU,selection=[]){
  const selected=new Set(selection),queue=[...list].filter(i=>!selected.has(currentSKU)||selected.has(i.sku)).sort((a,b)=>Number(a.sku.slice(2))-Number(b.sku.slice(2)));
  const position=queue.findIndex(i=>i.sku===currentSKU),ordered=[...queue.slice(position+1),...queue.slice(0,Math.max(position,0))];
- return ordered.find(i=>i.sku!==currentSKU&&i.analysis&&!i.approved&&i.status!=='exported')?.sku||null;
+ return ordered.find(i=>i.sku!==currentSKU&&i.analysis&&!i.approved&&i.status!=='exported'&&!excludedFromBatch(i))?.sku||null;
+}
+export const excludedFromBatch=item=>['sold','skipped'].includes(item.status);
+export function nextBatchSKU(list,currentSKU,selection=[],direction=1){
+ const chosen=new Set(selection);if(!chosen.size)return null;
+ const queue=[...list].filter(i=>chosen.has(i.sku)&&!excludedFromBatch(i)&&i.status!=='exported'&&!i.approved).sort((a,b)=>Number(a.sku.slice(2))-Number(b.sku.slice(2)));
+ const current=Number(currentSKU.slice(2));
+ const next=direction<0?[...queue].reverse().find(i=>Number(i.sku.slice(2))<current)||queue.at(-1):queue.find(i=>Number(i.sku.slice(2))>current)||queue[0];
+ return next?.sku!==currentSKU?next?.sku||null:null;
+}
+export function setBatchStatus(item,status){
+ if(!['skipped','sold'].includes(status))throw Error('Invalid batch status');
+ const draft=structuredClone(item);draft.previousBatchStatus=excludedFromBatch(item)?item.previousBatchStatus:item.status;
+ draft.status=status;draft.approved=false;draft.error='';return draft;
+}
+export function restoreBatchStatus(item){
+ if(!excludedFromBatch(item))throw Error('Item is already in the batch');
+ const draft=structuredClone(item),previous=draft.previousBatchStatus;
+ draft.status=previous==='approved'?'review':previous||(draft.analysis?'review':'new');
+ if(previous==='exported')draft.approved=true;
+ delete draft.previousBatchStatus;return draft;
 }
 export function description(item){const a=item.analysis;if(!a)return '';return [a.title,a.body,(a.sizeVerified===true&&!a.tagMissing?'Tagged size: ':'Size: ')+a.size,'Shipping: FREE','Please message us for the exact measurements.','Open to offers!','~AtlantaJake',a.hashtags.map(x=>'#'+x.replace(/^#/, '')).join(' '),item.sku].join('\n\n');}
-export function validate(item,tax){const a=item.analysis;const e=[];if(!a)return ['Analysis required'];if(!item.photos?.length)e.push('Photos missing');if(item.photos?.some(p=>!p.url?.startsWith('https://')))e.push('Upload photos before export');const d=item.description||description(item);if(!a.title?.trim())e.push('Title required');if(/\binventory (?:lists|says|notes|describes)\b|\b(?:size is unverified|unverified from photos|confirmed manufacturing year|design or copyright text|no readable (?:neck )?tag is shown)\b/i.test(d))e.push('Move internal verification commentary out of customer copy and into review notes');if(d.length>1000)e.push('Description exceeds 1,000 characters');const tags=d.match(/#[\w]+/g)||[];if(tags.length!==5)e.push('Use exactly five hashtags');else if(new Set(tags.map(t=>t.toLowerCase())).size!==5)e.push('Use five distinct hashtags');if(/\b(featuring|quirky|edgy)\b|[-–—]/i.test(d))e.push('Description contains prohibited wording or dashes');if(!Number.isFinite(Number(item.price))||Number(item.price)<=0)e.push('Price required');for(const [k,list] of [['brand','brands'],['category','categories'],['color','colors'],['age','ages'],['style1','styles'],['style2','styles']])if(!(['age','style1','style2'].includes(k)&&a[k]==='')&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!['S','M','L','XL','XXL','XS','XXS','3XL','4XL','One size'].includes(a.size))e.push('Check crewneck size');for(const [k,list] of [['color2','colors'],['source1','sources'],['style3','styles']])if(a[k]!==undefined&&a[k]!==''&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!tax.conditions.includes(item.condition))e.push('Condition required');e.push(...attributeErrors(item,tax),...sellerFactErrors(item));return e;}
+export function validate(item,tax){const a=item.analysis;const e=[];if(excludedFromBatch(item))e.push('Skipped or sold items cannot be approved or exported');if(!a)return [...e,'Analysis required'];if(!item.photos?.length)e.push('Photos missing');if(item.photos?.some(p=>!p.url?.startsWith('https://')))e.push('Upload photos before export');const d=item.description||description(item);if(!a.title?.trim())e.push('Title required');if(/\binventory (?:lists|says|notes|describes)\b|\b(?:size is unverified|unverified from photos|confirmed manufacturing year|design or copyright text|no readable (?:neck )?tag is shown)\b/i.test(d))e.push('Move internal verification commentary out of customer copy and into review notes');if(d.length>1000)e.push('Description exceeds 1,000 characters');const tags=d.match(/#[\w]+/g)||[];if(tags.length!==5)e.push('Use exactly five hashtags');else if(new Set(tags.map(t=>t.toLowerCase())).size!==5)e.push('Use five distinct hashtags');if(/\b(featuring|quirky|edgy)\b|[-–—]/i.test(d))e.push('Description contains prohibited wording or dashes');if(!Number.isFinite(Number(item.price))||Number(item.price)<=0)e.push('Price required');for(const [k,list] of [['brand','brands'],['category','categories'],['color','colors'],['age','ages'],['style1','styles'],['style2','styles']])if(!(['age','style1','style2'].includes(k)&&a[k]==='')&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!['S','M','L','XL','XXL','XS','XXS','3XL','4XL','One size'].includes(a.size))e.push('Check crewneck size');for(const [k,list] of [['color2','colors'],['source1','sources'],['style3','styles']])if(a[k]!==undefined&&a[k]!==''&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!tax.conditions.includes(item.condition))e.push('Condition required');e.push(...attributeErrors(item,tax),...sellerFactErrors(item));return e;}
 export function photoDeliveryURL(photo,origin){
  if(!origin||photo.provider!=='drive')return photo.url;
  const current=new URL(photo.url),target=new URL(origin);
@@ -124,6 +144,7 @@ export function importItem(source){const price=Number(source.RRP.replace(/[^\d.]
 export function mergeInventorySource(existing,source){
  if(!existing)return {item:importItem(source),change:'created'};
  if(existing.status==='exported')return {item:existing,change:'exported'};
+ if(excludedFromBatch(existing))return {item:existing,change:'excluded'};
  const equal=(a,b)=>JSON.stringify(Object.entries(a).sort(([x],[y])=>x.localeCompare(y)))===JSON.stringify(Object.entries(b).sort(([x],[y])=>x.localeCompare(y)));
  if(equal(existing.source,source))return {item:existing,change:'unchanged'};
  const oldDefaults=importItem(existing.source),newDefaults=importItem(source),item=structuredClone(existing);

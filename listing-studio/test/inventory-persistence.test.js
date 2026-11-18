@@ -15,7 +15,7 @@ function database(){
 test('CSV import stores inventory in D1, survives a new session and is idempotent',async()=>{
  const DB=database(),env={ADMIN_TOKEN:'test',DB};const sources=[source('AJ1028','Honda Crewneck'),source('AJ1029','Golf Crewneck')];
  let response=await worker.fetch(request(sources),env);assert.equal(response.status,200);
- assert.deepEqual((await response.json()).stats,{created:2,updated:0,unchanged:0,exported:0});assert.equal(DB.writes,2);
+ assert.deepEqual((await response.json()).stats,{created:2,updated:0,unchanged:0,exported:0,excluded:0});assert.equal(DB.writes,2);
  response=await worker.fetch(new Request('https://studio.example/api/items',{headers:{Authorization:'Bearer test'}}),env);
  assert.deepEqual((await response.json()).map(item=>item.sku),['AJ1028','AJ1029']);
  response=await worker.fetch(request(sources),env);assert.equal(response.status,200);
@@ -27,6 +27,7 @@ test('Updated CSV preserves photos and custom prices, invalidates changed drafts
  assert.equal(updated.change,'updated');assert.equal(updated.item.price,'70.00');assert.deepEqual(updated.item.photos,old.photos);
  assert.deepEqual(updated.item.analysis,old.analysis);assert.equal(updated.item.approved,false);assert.equal(old.approved,true);
  const exported={...old,status:'exported'};assert.equal(mergeInventorySource(exported,source('AJ1028','Different Item')).item,exported);
+ for(const status of ['sold','skipped'])assert.equal(mergeInventorySource({...old,status},source('AJ1028','Different Item')).change,'excluded');
  const fresh=mergeInventorySource(importItem(source('AJ1030','Red Crewneck','40')),source('AJ1030','Red Crewneck','50'));
  assert.equal(fresh.item.price,'62.50');
 });
