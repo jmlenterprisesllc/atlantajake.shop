@@ -5,8 +5,16 @@ export function parseCSV(text){
  if(cell||row.length){row.push(cell);rows.push(row);}return rows;
 }
 export function inventoryCSV(text){const rows=parseCSV(text.replace(/^\uFEFF/,''));const h=rows.shift();if(!h?.includes('SKU')||!h.includes('Item Name')||!h.includes('RRP'))throw Error('Inventory needs SKU, Item Name and RRP columns.');const seen=new Set();return rows.map(r=>{const v=Object.fromEntries(h.map((k,i)=>[k,r[i]||'']));v.SKU=v.SKU.trim().toUpperCase();if(!/^AJ\d+$/.test(v.SKU)||seen.has(v.SKU))throw Error('Invalid or duplicate SKU: '+v.SKU);seen.add(v.SKU);return v;});}
-export const LISTING_COPY_STANDARD='2026-11-17-seller-facts-v6';
+export const LISTING_COPY_STANDARD='2026-11-18-mixed-tops-v7';
 export const SWEATSHIRT_CATEGORY='Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)';
+export function topCategories(tax){return tax.categories.filter(c=>/ >> Tops >> (Hoodies|Sweatshirts) \(/.test(c));}
+export function inventoryGarment(source={}){
+ const category=String(source.Category||'');
+ const text=category||String(source['Item Name']||'');
+ if(/\bhood(?:ie|ies|ed)\b/i.test(text))return 'Hoodies';
+ if(/\bcrewneck\b|\bsweatshirt\b/i.test(text))return 'Sweatshirts';
+ return '';
+}
 export function dropdownChoices(values,current,allowBlank=false){
  const unknown=!values.includes(current)&&!(allowBlank&&current==='');
  return [...(unknown?[{value:'__invalid__',text:`Choose a valid value (saved: ${current||'missing'})`,selected:true,disabled:true}]:[]),...(allowBlank?[{value:'',text:'Not specified',selected:current==='',disabled:false}]:[]),...values.map(value=>({value,text:label(value),selected:value===current,disabled:false}))];
@@ -19,7 +27,8 @@ export function inventoryEra(source={}){
 }
 export function attributeErrors(item,tax){
  const a=item.analysis;if(!a)return [];const errors=[];
- if(a.category!==SWEATSHIRT_CATEGORY)errors.push('Crewneck category must be Men > Tops > Sweatshirts for this studio.');
+ const garment=inventoryGarment(item.source);
+ if(garment&&!a.category?.includes(' >> Tops >> '+garment+' ('))errors.push((garment==='Hoodies'?'Hoodie':'Crewneck')+' category must match the inventory garment type: '+garment+'.');
  const era=inventoryEra(item.source);if(era&&a.age&&a.age!==era)errors.push('Age conflicts with inventory: '+label(era)+'. Verify the date; select that era or leave age unspecified if dating is uncertain.');
  return errors;
 }
@@ -129,7 +138,7 @@ export function restoreBatchStatus(item){
  delete draft.previousBatchStatus;return draft;
 }
 export function description(item){const a=item.analysis;if(!a)return '';return [a.title,a.body,(a.sizeVerified===true&&!a.tagMissing?'Tagged size: ':'Size: ')+a.size,'Shipping: FREE','Please message us for the exact measurements.','Open to offers!','~AtlantaJake',a.hashtags.map(x=>'#'+x.replace(/^#/, '')).join(' '),item.sku].join('\n\n');}
-export function exportErrors(item,tax){const a=item.analysis;const e=[];if(excludedFromBatch(item))e.push('Skipped or sold items cannot be approved or exported');if(!a)return [...e,'Analysis required'];if(!item.photos?.length)e.push('Photos missing');if(item.photos?.some(p=>!p.url?.startsWith('https://')))e.push('Upload photos before export');const d=item.description||description(item);if(!a.title?.trim())e.push('Title required');if((d.match(/#[\w]+/g)||[]).length>5)e.push('Use no more than five hashtags for export');if(d.length>1000)e.push('Description exceeds 1,000 characters');if(!Number.isFinite(Number(item.price))||Number(item.price)<=0)e.push('Price required');for(const [k,list] of [['brand','brands'],['category','categories'],['color','colors'],['age','ages'],['style1','styles'],['style2','styles']])if(!(['age','style1','style2'].includes(k)&&a[k]==='')&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!['S','M','L','XL','XXL','XS','XXS','3XL','4XL','One size'].includes(a.size))e.push('Check crewneck size');for(const [k,list] of [['color2','colors'],['source1','sources'],['style3','styles']])if(a[k]!==undefined&&a[k]!==''&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!tax.conditions.includes(item.condition))e.push('Condition required');return e;}
+export function exportErrors(item,tax){const a=item.analysis;const e=[];if(excludedFromBatch(item))e.push('Skipped or sold items cannot be approved or exported');if(!a)return [...e,'Analysis required'];if(!item.photos?.length)e.push('Photos missing');if(item.photos?.some(p=>!p.url?.startsWith('https://')))e.push('Upload photos before export');const d=item.description||description(item);if(!a.title?.trim())e.push('Title required');if((d.match(/#[\w]+/g)||[]).length>5)e.push('Use no more than five hashtags for export');if(d.length>1000)e.push('Description exceeds 1,000 characters');if(!Number.isFinite(Number(item.price))||Number(item.price)<=0)e.push('Price required');for(const [k,list] of [['brand','brands'],['category','categories'],['color','colors'],['age','ages'],['style1','styles'],['style2','styles']])if(!(['age','style1','style2'].includes(k)&&a[k]==='')&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!['S','M','L','XL','XXL','XS','XXS','3XL','4XL','One size'].includes(a.size))e.push('Check export size against the Depop template; keep the original numeric or designer size in the description and do not guess a conversion');for(const [k,list] of [['color2','colors'],['source1','sources'],['style3','styles']])if(a[k]!==undefined&&a[k]!==''&&!tax[list].includes(a[k]))e.push('Select valid '+k);if(!tax.conditions.includes(item.condition))e.push('Condition required');return e;}
 export function copyStyleSuggestions(copy){
  const notes=[];
  if(/\b(?:standout|statement piece|eye catching|head turning|must have|timeless appeal|souvenir style look|(?:brings?|gives? off|adds?)\s+(?:\w+\s+){0,2}energy|\w+ vibes)\b/i.test(copy))notes.push('Consider replacing promotional filler with specific garment details.');

@@ -1,6 +1,6 @@
 import {driveReady,skuFolders,drivePhotos,photoResponse} from './drive.js';
 import {authorised,session,sessionCookie,logoutCookie,loginPage,correctPassword} from './auth.js';
-import {description,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource,excludedFromBatch} from '../public/core.js';
+import {description,topCategories,inventoryGarment,completeGeneratedTitle,sellerTitleFacts,mergeInventorySource,excludedFromBatch} from '../public/core.js';
 import {LISTING_INSTRUCTIONS} from './listing-prompt.js';
 import {LISTING_STANDARD,listingSchema,resolveBrand} from './listing-quality.js';
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -86,7 +86,7 @@ export default {async fetch(req,env){
  if(!lease.meta.changes)return json({error:'This item is already being analyzed. Wait before retrying.'},409);
  try {
  const driveSets=new Map();
- const content=[{type:'input_text',text:JSON.stringify({inventory:item.source,requiredTitleFacts:sellerTitleFacts(item.source),brandOptions:candidates,colors:tax.colors,ages:tax.ages,styles:tax.styles,category:'Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)'})}];
+ const content=[{type:'input_text',text:JSON.stringify({inventory:item.source,requiredTitleFacts:sellerTitleFacts(item.source),brandOptions:candidates,colors:tax.colors,ages:tax.ages,styles:tax.styles,categoryOptions:topCategories(tax),inventoryGarment:inventoryGarment(item.source)})}];
  for(const p of item.photos){if(p.provider==='drive'){if(!driveSets.has(p.folderId))driveSets.set(p.folderId,await drivePhotos(env,sku,p.folderId,u.origin));const current=driveSets.get(p.folderId);const match=current.find(f=>f.fileId===p.fileId);if(!match)return json({error:'Photo missing from SKU folder'},400);content.push({type:'input_image',image_url:match.url,detail:'high'});}else{if(!env.PHOTOS||!await env.PHOTOS.head(p.key))return json({error:'Photo missing; reupload '+p.name},400);content.push({type:'input_image',image_url:u.origin+'/photos/'+p.key,detail:'high'});}}
  const result=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:'Bearer '+env.OPENAI_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({model:env.OPENAI_MODEL,store:false,instructions:LISTING_INSTRUCTIONS,input:[{role:'user',content}],text:{format:{type:'json_schema',name:'depop_listing',strict:true,schema:listingSchema(tax)}},max_output_tokens:2600})});
  if(!result.ok)return json({error:'Image analysis failed ('+result.status+'). Check account billing/model access; retry manually.'},502);

@@ -1,5 +1,5 @@
 // This records a generation standard, not a search-ranking score.
-import {LISTING_COPY_STANDARD} from '../public/core.js';
+import {LISTING_COPY_STANDARD,topCategories} from '../public/core.js';
 export const LISTING_STANDARD=LISTING_COPY_STANDARD;
 const plain=value=>String(value||'').replace(/ \([^)]*\)$/,'');
 const key=value=>plain(value).normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g,'');
@@ -17,7 +17,7 @@ export function listingSchema(tax){
   title:{type:'string',description:'Readable buyer phrase using the strongest supported identity, era/event and exact garment type. Title Case is presentation, not a ranking claim.'},
   body:{type:'string',description:'2–3 appealing customer-facing sales sentences preserving explicit seller facts. No inventory/photo-verification commentary or manufacturing-year disclaimer; put conflicts in flags.'},
   brand:{type:'string',description:'Actual maker from readable tag or reliable inventory, even if absent from brandOptions. Plain maker name accepted; server resolves against the entire template. Other if unknown.'},
-  category:{type:'string',enum:['Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)']},
+  category:{type:'string',enum:topCategories(tax)},
   color:{type:'string',enum:tax.colors},color2:{type:'string',enum:['',...tax.colors],description:'Secondary garment color only when a substantial area, such as contrasting cuffs, supports it. Blank otherwise; a multicolor printed graphic alone is not Multi fabric.'},age:{type:'string',enum:['',...tax.ages]},
   style1:{type:'string',enum:['',...tax.styles]},style2:{type:'string',enum:['',...tax.styles]},size:string,
   tagMissing:{type:'boolean'},sizeVerified:{type:'boolean'},hashtags:{type:'array',minItems:5,maxItems:5,items:string},flags:{type:'array',items:string}
