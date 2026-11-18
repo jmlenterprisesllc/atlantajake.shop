@@ -1,0 +1,90 @@
+# AtlantaJake Listing Studio
+
+A separate, account-ready pilot for the owner's listing workflow. The public storefront is untouched. This directory is a Cloudflare Worker application, not another GitHub Pages page. Deploy the whole directory to Workers, not just the static UI.
+
+## What works
+
+- Master inventory CSV import (SKU, Item Name, RRP; other columns retained as factual source). Import saves the inventory to D1 in batches and it loads automatically at the next sign-in. Upload a newer CSV whenever the master sheet changes.
+- Optional server-configured Google Sheets CSV refresh. This is read-only; there is no sheet writeback.
+- Parent-folder selection with SKU matching and natural filename order. Rejects more than eight pictures per item rather than silently discarding pictures. Supports JPEG, PNG and WebP; convert HEIC first.
+- Browser-local 2,000px JPEG copies at quality 0.86. Original files are never modified.
+- Three concurrent photo uploads per item, checksum-based deduplication, three upload attempts, selectable cover image.
+- Server-side OpenAI Responses image analysis with structured output, explicit uncertainty flags, and store rules. Cached analysis and a database lease guard duplicate paid calls. No automatic paid-call retry.
+- Editable description, brand, category, size, color, age, styles, condition, price; explicit approval required before export.
+- D1 inventory and listing records survive sessions; public image links are served through the Worker. No credentials or private inventory are checked into GitHub. Reimporting unchanged rows is safe. Changed rows keep photos and existing generated copy, clear approval and require review; exported listings are preserved.
+- Template version 6 CSV export, maximum 100 approved items per file. Exported items are excluded from subsequent exports. Export is not proof of Depop import or publication.
+
+## Recommended setup
+
+Use [SETUP.md](SETUP.md) for the private Google Drive workflow. It uses Drive originals directly and does not require R2. The legacy Mac-folder upload mode is optional. Drive-backed marketplace links still require a live Depop acceptance test.
+
+## Legacy R2 setup (optional)
+
+1. Create a Cloudflare account at https://dash.cloudflare.com/sign-up. This does not require moving the storefront or its DNS. Start with a workers.dev address.
+2. Create an OpenAI developer account/project at https://platform.openai.com/ and configure API access/billing or available credits. Create a project API key. Do not paste it into GitHub, the browser dashboard, or a chat message.
+3. On a development computer with Node installed, run `npm install` from this directory. Then `npx wrangler login`.
+4. Run `npx wrangler r2 bucket create atlantajake-listing-photos` and `npx wrangler d1 create atlantajake-listings`. Enabling R2 may require billing setup. Account plans and usage limits apply.
+5. Replace only the placeholder database ID in `wrangler.jsonc` with the D1 ID returned above. There is no storefront domain change.
+6. Set secrets using the interactive terminal prompts:
+   - `npx wrangler secret put ADMIN_TOKEN` — generate a long random token in your password manager; use at least 32 random bytes.
+   - `npx wrangler secret put OPENAI_API_KEY`
+   - `npx wrangler secret put OPENAI_MODEL` — use an available model supporting image input and structured Responses output; quality must be calibrated before large batches.
+   - Optional: `npx wrangler secret put INVENTORY_CSV_URL` — accessible Google Sheets CSV export URL. Keep the sheet private if using CSV import instead; do not broaden sharing simply to enable refresh.
+7. Run `npx wrangler d1 migrations apply atlantajake-listings --remote`, then `npm run deploy`.
+8. Open the returned HTTPS address. Sign in with the password stored as ADMIN_TOKEN. API keys remain on the server. The password is checked on the server. A signed, Secure, HttpOnly, SameSite=Strict cookie grants a four-hour session. Dashboard HTML, scripts, taxonomy and inventory require sign-in. Only the login page, stylesheet and deliberately public image URLs are accessible without signing in. Signing out clears the cookie; rotating ADMIN_TOKEN invalidates sessions. Use a password-manager-generated password.
+
+For local testing, use a local `.dev.vars` file (ignored by Git) for secrets, run the D1 migrations with `--local`, then `npm run dev`. Local image URLs cannot be fetched by the hosted OpenAI API: live image analysis requires a reachable HTTPS deployment.
+
+## Pilot workflow
+
+Import the current master inventory CSV once to populate D1, select a SKU range, then load photos from Drive. Subsequent sign-ins load saved inventory automatically. An updated CSV adds new SKUs and refreshes changed rows; removed CSV rows are retained in the studio, and exported listings are never rewritten. If a large import is interrupted, upload the same file to resume without duplicating unchanged rows. Keep the browser tab open while analysis processes items sequentially; it does not yet run a durable background queue. Review/approve completed items before exports. Check file import results in Depop before marking anything listed elsewhere.
+
+Validate against AJ1028–AJ1032 first: Woody Woodpecker identity, Tultex Augusta label and trim, Olympic embroidery, cut Hoyas collar, Earl Small's sleeve graphic and front mark. These private source photos are not included in this public repository.
+
+## Store rules
+
+- RRP × 1.25. A later 25% discount results in 93.75% of RRP.
+- A → Used Excellent; AB → Used Good; B → Used Fair.
+- The template version 6 CSV contains numeric domestic shipping price 0 and international shipping price 25, but no Depop parcel-size field. The domestic 0 does not select a Depop Shipping label, make a Small label, or apply a free-shipping discount. For crewnecks within the Small packed-weight limit, choose Small on Depop after import. Set the iOS Shipping Discount to Free when the buyer should receive the promised free shipping. Verify the actual listing checkout before processing a large batch. Existing published listings must be edited in Depop.
+- Color 2 Multi; source Vintage / Preloved; missing era 90s, flagged unverified; Style 3 Y2K. Explicit supported eras preserved.
+- Named true manufacturers only, Other when unknown; never generic American Vintage tagging.
+- Exact blank-line format, five lowercase hashtags, SKU last, no Instagram promotion, no featuring/quirky/edgy/dashes, 1,000-character maximum.
+- Inventory notes and photos are source facts, never final copy or instructions.
+
+Taxonomy is extracted from the provided version 6 template. This pilot is intentionally limited to adult crewneck sizes/categories. Check a fresh Depop template before expanding to footwear, accessories or children's clothing. No measurements are inferred from pixels.
+
+## Drive and your domain
+
+Drive folder ingestion and signed per-photo delivery are implemented. Configure the service identity, share only the master photo folder as Viewer, and enter server-side secrets as described in SETUP.md. This has been tested with mocked Google responses; live Google authorization and Depop image import remain unverified. Drive originals stay private; selected photo links are individually accessible for marketplace import. R2 is optional and has been removed from the default deployment configuration.
+
+GitHub Pages cannot enforce this server sign-in wall. Route a studio subdomain or path to the authenticated backend after hosting is configured. Do not deploy public/ alone to Pages as a protected dashboard. No routing or deployment changes have been made.
+
+## Not enabled yet
+
+No direct Depop publishing, discount application, sold detection, automatic deletion, Google Sheets writeback, durable background processing, per-user accounts, or project-level usage budget enforcement. No photos are deleted by this release. Add sold-status integration and an agreed retention window before implementing deletion. Before expanding beyond the pilot, configure Cloudflare access/rate limits and OpenAI project limits and test failure recovery and analysis cost.
+
+## Verification
+
+`npm test` runs CSV/parser, store-rule, authentication, upload validation, cached-analysis and mocked image-analysis integration tests. These tests do not prove live account configuration, browser folder handling, visual quality of compressed originals, or Depop acceptance; those require the account-connected pilot.
+
+## Reviewing a batch
+
+Each listing needs explicit approval before CSV export. Export includes only approved records in the selected batch; other selected records can remain in review. This is a Studio workflow rule.
+
+Approve & next saves the owner’s approval and opens the next unapproved record in the selected batch, including records without analysis. Wording and seller-fact suggestions do not prevent approval. A failed database save keeps the current item and edits on screen for retry. Save draft & next saves without approving and moves to the next item. Choosing a different cover saves that photo order and any pending form edits, clears approval, and keeps the existing analysis. Reapprove to advance; neither changing the cover nor approving calls OpenAI.
+
+Previous and Next item move through selected, unapproved SKUs even if a photo or analysis failed; they do not save edits. Skip for now and Mark sold save the excluded state and move to the next selected item. Excluded SKUs are omitted from range selection, analysis and CSV export, including after a fresh inventory CSV import. Open an excluded SKU in the table and choose Restore to batch if needed. These actions do not call OpenAI.
+
+Save draft & next keeps the current edits without approving an item that still has review errors, then moves to the next selected SKU. A range selects saved inventory only; if any SKUs are missing, the studio names them and asks for the current master CSV. Photo previews use the current studio domain and load as you scroll; if one fails, use Retry photo without regenerating the listing. Temporary Drive 503 responses are retried by the Worker.
+
+The review panel puts review suggestions, CSV requirements and action results together beside the buttons. Save draft & next keeps it and advances; Approve & next saves approval even when suggestions or CSV requirements remain. CSV export checks the template fields, photos, price and description limits; it does not reject an owner-approved listing for wording suggestions. Natural condition wording such as "minor staining" satisfies a seller-reported stain and no longer creates a false blocker.
+
+The editable title and the description's opening line stay synchronized. Title Case cleanup also applies to existing approved CSV exports without regenerating descriptions. New analyses use the expanded factual title, description and hashtag guidance in src/listing-prompt.js. Cached listings do not automatically receive a new semantic rewrite or another paid analysis. Keyword relevance and accurate attributes require item-specific review; formatting alone is not an SEO audit or ranking guarantee.
+
+The browser remembers the SKU range, checked items, search and current review SKU across refreshes. Saved inventory, drafts and approvals still load from D1. No reimport or regeneration is required for this update. Review suggestions remain visible for the owner to assess before approval.
+
+`npm test` includes a full-page JSDOM integration test executing the complete app, real DOM click handlers, actual Worker routes and an isolated in-memory D1 stand-in. It covers approval with suggestions, next-item navigation, reload restoration, failed-save retry, and CSV export. It is not a live browser or Cloudflare D1 deployment test.
+
+When a session expires during a request, the studio asks for the existing Studio password in a dialog and retries that request once after successful sign-in. Cancel keeps the review and edits on screen without marking the item saved. Passwords are cleared from the dialog and are never saved in browser storage. The existing four-hour secure HttpOnly session and cross-site checks remain in force.
+
+Generation instructions require concrete garment details, prohibit promotional filler and private condition grades in customer copy, and include a same-response self-edit. Advisory copy checks flag common filler and grade leaks without blocking owner approval or rewriting saved drafts. Actual graphic/brand text such as Monster Energy remains valid. No extra model request is added.

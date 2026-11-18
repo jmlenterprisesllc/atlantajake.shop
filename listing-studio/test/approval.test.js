@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+import {reviewDraft,coverDraft,nextReviewSKU,nextBatchSKU,setBatchStatus,restoreBatchStatus,excludedFromBatch} from '../public/core.js';
+const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
+const start=app.indexOf(' const save=async('),end=app.indexOf(";$('saveNext').onclick",start);
+const coverStart=app.indexOf('async function chooseCover('),coverEnd=app.indexOf('\nfunction review(){',coverStart);
+function setup({errors=[],fail=false,others=[],selection,item:existingItem}={}){
+ const item=existingItem?structuredClone(existingItem):{sku:'AJ1028',analysis:{title:'Honda Racing Black Crewneck Sweatshirt',size:'S'},description:'Honda Racing Black Crewneck Sweatshirt\n\nReviewed item details.',price:'56.25',condition:'good',photos:[{name:'front.jpg',url:'https://studio.example/front.jpg'},{name:'back.jpg',url:'https://studio.example/back.jpg'}],approved:false,status:'review',error:'old analysis error'};
+ const controls={save:{},approve:{},reviewFeedback:{},title:{value:item.analysis?.title||''},price:{value:'56.25'},condition:{value:'good'},description:{value:item.description},review:{scrollIntoView:()=>{},querySelectorAll:()=>[{dataset:{field:'size'},value:'M'}]}};
+ const items=new Map([item,...others].map(i=>[i.sku,i]));let saved,saveCount=0;
+ const context=vm.createContext({i:item,active:item.sku,busy:false,reviewSaving:false,inventorySaving:false,$:id=>controls[id],structuredClone,tax:{},exportErrors:()=>errors,readReviewDraft:i=>reviewDraft(i,{title:controls.title.value,description:controls.description.value,price:controls.price.value,condition:controls.condition.value,fields:{size:'M'}}),coverDraft,nextReviewSKU,nextBatchSKU,setBatchStatus,restoreBatchStatus,excludedFromBatch,visible:()=>[...items.values()],selected:new Set(selection||[...items.keys()]),reviewFeedback:message=>{controls.reviewFeedback.textContent=message;},refreshValidation:()=>{controls.refreshed=true;},setReviewBusy:value=>{controls.save.disabled=value;controls.approve.disabled=value;},persist:async draft=>{saveCount++;if(fail)throw Error('Session expired. Sign in again.');saved=draft;},items,render:()=>{},review:()=>{}});
+ const save=vm.runInContext(app.slice(start,end)+'; save',context);
+ const actions=vm.runInContext(app.slice(coverStart,coverEnd)+'; ({chooseCover,navigateBatch,excludeCurrent,restoreCurrent})',context);
+ return {save,...actions,item,controls,items,selected:context.selected,get active(){return context.active;},get saved(){return saved;},get saveCount(){return saveCount;}};
+}
+const pending=sku=>({sku,analysis:{title:'Another Crewneck Sweatshirt'},approved:false,status:'review'});
+test('Approval saves edited draft and confirms readiness next to buttons',async()=>{const t=setup();await t.save(true);assert.equal(t.saved.approved,true);assert.equal(t.saved.analysis.size,'M');assert.equal(t.saved.error,'');assert.equal(t.items.get('AJ1028').status,'approved');assert.match(t.controls.reviewFeedback.textContent,/approval saved.*Ready for CSV export/);assert.equal(t.controls.approve.disabled,false);});
+test('Successful approval advances to the next analyzed unapproved item in the selected batch',async()=>{const t=setup({others:[pending('AJ1029'),pending('AJ1030')]});await t.save(true);assert.equal(t.active,'AJ1029');assert.match(t.controls.reviewFeedback.textContent,/Now reviewing AJ1029/);});
+test('Cover change preserves unsaved edits, clears approval and advances after reapproval',async()=>{const t=setup({others:[pending('AJ1029')]});t.item.approved=true;t.item.status='approved';t.controls.title.value='red rah rah 20 crewneck sweatshirt';t.controls.description.value='Old title\n\nEdited details that must survive the cover change.';t.controls.price.value='72.50';await t.chooseCover(1);const changed=t.items.get('AJ1028');assert.equal(changed.photos[0].name,'back.jpg');assert.equal(changed.approved,false);assert.equal(changed.status,'review');assert.equal(changed.price,'72.50');assert.match(changed.description,/Edited details that must survive/);assert.equal(changed.analysis.title,'Red Rah Rah 20 Crewneck Sweatshirt');assert.equal(t.active,'AJ1028');const nextReview=setup({item:changed,others:[pending('AJ1029')]});await nextReview.save(true);assert.equal(nextReview.active,'AJ1029');assert.equal(nextReview.saved.photos[0].name,'back.jpg');assert.match(nextReview.saved.description,/Edited details that must survive/);});
+test('Clicking current cover is a no-op and does not clear approval',async()=>{const t=setup();t.item.approved=true;await t.chooseCover(0);assert.equal(t.saveCount,0);assert.equal(t.item.approved,true);});
+test('Save changes retains the current item as a draft',async()=>{const t=setup({others:[pending('AJ1029')]});await t.save(false);assert.equal(t.active,'AJ1028');assert.equal(t.saved.approved,false);assert.match(t.controls.reviewFeedback.textContent,/saved as a draft/);});
+test('Save draft and next persists edits and advances even when approval is blocked',async()=>{const t=setup({errors:['Check category'],others:[pending('AJ1029')]});await t.save(false,true);assert.equal(t.saved.approved,false);assert.equal(t.saved.status,'review');assert.equal(t.saved.analysis.size,'M');assert.equal(t.active,'AJ1029');assert.match(t.controls.reviewFeedback.textContent,/not approved for export/);});
+test('Owner approval saves and advances even with remaining export requirements',async()=>{const t=setup({errors:['Photos missing'],others:[pending('AJ1029')]});await t.save(true);assert.equal(t.saved.approved,true);assert.equal(t.items.get('AJ1028').approved,true);assert.equal(t.active,'AJ1029');assert.match(t.controls.reviewFeedback.textContent,/Export fields still need attention/);});
+test('Failed save does not mark item approved or advance',async()=>{const t=setup({fail:true,others:[pending('AJ1029')]});await t.save(true);assert.equal(t.items.get('AJ1028').approved,false);assert.equal(t.active,'AJ1028');assert.match(t.controls.reviewFeedback.textContent,/Session expired/);assert.equal(t.controls.save.disabled,false);});
+test('Failed cover save preserves the previous approved cover',async()=>{const t=setup({fail:true});t.item.approved=true;await t.chooseCover(1);assert.equal(t.items.get('AJ1028').photos[0].name,'front.jpg');assert.equal(t.items.get('AJ1028').approved,true);assert.match(t.controls.reviewFeedback.textContent,/Session expired/);});
+test('Next navigates past an item with no analysis or usable photos',()=>{const missing={sku:'AJ1061',analysis:null,photos:[],status:'needs attention',source:{'Item Name':'Sold crewneck'}};const t=setup({item:missing,others:[pending('AJ1062')]});t.navigateBatch(1);assert.equal(t.active,'AJ1062');assert.equal(t.saveCount,0);});
+test('Mark sold saves exclusion, moves on, and restores without losing the draft',async()=>{const missing={sku:'AJ1061',analysis:null,photos:[],status:'needs attention',source:{'Item Name':'Sold crewneck'}};const t=setup({item:missing,others:[pending('AJ1062')]});await t.excludeCurrent('sold');assert.equal(t.saved.status,'sold');assert.equal(t.saved.approved,false);assert.equal(t.selected.has('AJ1061'),false);assert.equal(t.active,'AJ1062');assert.equal(nextBatchSKU([...t.items.values()],'AJ1060',['AJ1061','AJ1062']),'AJ1062');
+ const again=setup({item:t.saved,others:[pending('AJ1062')]});await again.restoreCurrent();assert.equal(again.saved.status,'needs attention');assert.equal(again.selected.has('AJ1061'),true);
+});
+test('Skip for now persists across a new review session and never approves a failed listing',async()=>{const t=setup({others:[pending('AJ1029')]});await t.excludeCurrent('skipped');assert.equal(t.active,'AJ1029');assert.equal(t.items.get('AJ1028').status,'skipped');assert.equal(t.items.get('AJ1028').approved,false);});
+test('Failed sold save keeps current item and selection unchanged',async()=>{const t=setup({fail:true,others:[pending('AJ1029')]});await t.excludeCurrent('sold');assert.equal(t.active,'AJ1028');assert.equal(t.selected.has('AJ1028'),true);assert.equal(t.items.get('AJ1028').status,'review');});
+test('Review shows navigation and skip actions even without analysis',()=>{
+ const begin=app.indexOf('function review(){'),end=app.indexOf("\n$('search').oninput",begin);
+ const controls={review:{innerHTML:'',querySelectorAll:()=>[]},previous:{},next:{},skip:{},markSold:{},restore:null};
+ const item={sku:'AJ1061',source:{'Item Name':'Vintage 911 eagle crewneck'},analysis:null,photos:[],status:'needs attention',error:'Request failed: 503'};
+ const context=vm.createContext({active:item.sku,items:new Map([[item.sku,item]]),$:id=>controls[id],excludedFromBatch,escape:value=>String(value),previewSellerTitle:()=>{},exportErrors:()=>[],reviewNotes:()=>[],exportAttributes:()=>{},navigateBatch:()=>{},excludeCurrent:()=>{},restoreCurrent:()=>{},chooseCover:()=>{},tax:{}});
+ vm.runInContext(app.slice(begin,end)+'; review()',context);
+ assert.match(controls.review.innerHTML,/Next item/);assert.match(controls.review.innerHTML,/Skip for now/);
+ assert.match(controls.review.innerHTML,/Mark sold/);assert.equal(typeof controls.next.onclick,'function');
+});
+test('Blockers, review notes and action feedback appear together beside the save actions',()=>{
+ const begin=app.indexOf('function review(){'),end=app.indexOf("\n$('search').oninput",begin);
+ const issue='Documented stains must be disclosed in the sales description.';
+ const item={sku:'AJ1040',source:{'Item Name':'Coca Cola crewneck'},analysis:{title:'Coca Cola Crewneck',size:'L',flags:['Check tag details']},description:'Coca Cola Crewneck\n\nDetails',photos:[],price:'31.25',condition:'Used - Fair',status:'review',listingStandard:'standard'};
+ const controls={review:{innerHTML:'',querySelectorAll:()=>[]}},$=id=>controls[id]??={};
+ const context=vm.createContext({active:item.sku,items:new Map([[item.sku,item]]),$,location:{origin:'https://studio.example'},excludedFromBatch,escape:value=>String(value),previewSellerTitle:record=>record,exportErrors:()=>[],reviewNotes:()=>[issue,'Check tag details'],exportAttributes:()=>({}),dropdownChoices:()=>[],LISTING_COPY_STANDARD:'standard',tax:{},navigateBatch:()=>{},excludeCurrent:()=>{},restoreCurrent:()=>{},chooseCover:()=>{},refreshValidation:()=>{},reviewFeedback:()=>{},setReviewBusy:()=>{},readReviewDraft:()=>item,persist:()=>{},render:()=>{},selected:new Set([item.sku])});
+ vm.runInContext(app.slice(begin,end)+';review()',context);
+ const html=controls.review.innerHTML;
+ assert.equal(html.split(issue).length-1,1);assert.equal(html.split('Check tag details').length-1,1);
+ assert.ok(html.indexOf('</textarea>')<html.indexOf('class="reviewChecks"'));
+ assert.ok(html.indexOf('class="reviewChecks"')<html.indexOf('id="saveNext"'));
+ assert.equal(html.split('id="reviewFeedback"').length-1,1);
+});
+
+test('Approval stays inside a nonempty selection when current item is outside it',async()=>{const t=setup({others:[pending('AJ1029'),pending('AJ1030')],selection:['AJ1030']});await t.save(true);assert.equal(t.active,'AJ1030');});
+test('Approval advances to a pending item even when that item has no analysis',async()=>{const t=setup({others:[{sku:'AJ1029',analysis:null,status:'new',approved:false}]});await t.save(true);assert.equal(t.active,'AJ1029');});
