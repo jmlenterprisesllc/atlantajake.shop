@@ -5,7 +5,7 @@ export function parseCSV(text){
  if(cell||row.length){row.push(cell);rows.push(row);}return rows;
 }
 export function inventoryCSV(text){const rows=parseCSV(text.replace(/^\uFEFF/,''));const h=rows.shift();if(!h?.includes('SKU')||!h.includes('Item Name')||!h.includes('RRP'))throw Error('Inventory needs SKU, Item Name and RRP columns.');const seen=new Set();return rows.map(r=>{const v=Object.fromEntries(h.map((k,i)=>[k,r[i]||'']));v.SKU=v.SKU.trim().toUpperCase();if(!/^AJ\d+$/.test(v.SKU)||seen.has(v.SKU))throw Error('Invalid or duplicate SKU: '+v.SKU);seen.add(v.SKU);return v;});}
-export const LISTING_COPY_STANDARD='2026-11-12-seller-facts-v5';
+export const LISTING_COPY_STANDARD='2026-11-17-seller-facts-v6';
 export const SWEATSHIRT_CATEGORY='Men >> Tops >> Sweatshirts (menswear, tops, sweatshirts)';
 export function dropdownChoices(values,current,allowBlank=false){
  const unknown=!values.includes(current)&&!(allowBlank&&current==='');
@@ -25,6 +25,28 @@ export function attributeErrors(item,tax){
 }
 // Check only facts that can be extracted with high confidence from seller notes.
 // This catches omissions; it does not score persuasiveness or search placement.
+export function sellerTitleFacts(source={}){
+ const notes=[source['Item Name'],source['Description/Details'],source.Era].filter(Boolean).join(' ');
+ const vintage=/\bvintage\b/i.test(notes)&&!/\bvintage[\s-]+(?:inspired|style|look)\b/i.test(String(source['Item Name']||''));
+ const datedVintage=notes.match(/\bvintage\s+(19[5-9]\d|200\d)\b/i)?.[1]||'';
+ const years=[...new Set([...String(source['Item Name']||'').matchAll(/\b(?:19[5-9]\d|20[0-2]\d)\b/g)].map(m=>m[0]))];
+ return {vintage,datedVintage,year:datedVintage||(years.length===1?years[0]:'')};
+}
+// A model may omit a required seller fact even when prompted. Repair only these
+// explicit title facts, before saving the paid generation; never rewrite old drafts.
+export function completeGeneratedTitle(title,source={}){
+ const facts=sellerTitleFacts(source);let result=formatTitle(title);
+ if(facts.vintage&&!/\bvintage\b/i.test(result))result='Vintage '+result;
+ if(facts.year&&!new RegExp('\\b'+facts.year+'\\b').test(result)){
+  result=/^Vintage\b/i.test(result)?result.replace(/^Vintage\b/i,'Vintage '+facts.year):facts.year+' '+result;
+ }
+ return formatTitle(result);
+}
+export function previewSellerTitle(item){
+ if(!item.analysis)return item;
+ const copy=item.description||description(item);
+ return reviewDraft(item,{title:completeGeneratedTitle(copy.split(/\r?\n/)[0]||item.analysis.title,item.source)});
+}
 export function sellerFactErrors(item){
  const source=item.source||{},a=item.analysis;if(!a)return [];
  const notes=[source['Item Name'],source['Description/Details'],source.Era].filter(Boolean).join(' ');
@@ -34,17 +56,15 @@ export function sellerFactErrors(item){
  const body=customerText.slice(title.length).trim();
  const copy=title+' '+body;
  const errors=[];
- const sellerVintage=/\bvintage\b/i.test(notes)&&!/\bvintage[\s-]+(?:inspired|style|look)\b/i.test(String(source['Item Name']||''));
+ const titleFacts=sellerTitleFacts(source),sellerVintage=titleFacts.vintage;
  if(sellerVintage&&!/\bvintage\b/i.test(title))errors.push('Seller-described vintage status is missing from the title.');
  if(sellerVintage&&/#vintage(?:style|inspired)\b/i.test(rendered))errors.push('Use an actual vintage item hashtag instead of #vintagestyle or #vintageinspired.');
- const datedVintage=notes.match(/\bvintage\s+(19[5-9]\d|200\d)\b/i);
- if(datedVintage&&!new RegExp('\\b'+datedVintage[1]+'\\b').test(title))errors.push('Seller-confirmed vintage year '+datedVintage[1]+' is missing from the title.');
- const sourceYears=[...new Set([...String(source['Item Name']||'').matchAll(/\b(?:19[5-9]\d|20[0-2]\d)\b/g)].map(m=>m[0]))];
- if(!datedVintage&&sourceYears.length===1&&!new RegExp('\\b'+sourceYears[0]+'\\b').test(title))errors.push('Seller-described year '+sourceYears[0]+' is missing from the title.');
+ if(titleFacts.datedVintage&&!new RegExp('\\b'+titleFacts.datedVintage+'\\b').test(title))errors.push('Seller-confirmed vintage year '+titleFacts.datedVintage+' is missing from the title.');
+ if(!titleFacts.datedVintage&&titleFacts.year&&!new RegExp('\\b'+titleFacts.year+'\\b').test(copy))errors.push('Seller-described year '+titleFacts.year+' is missing from the listing.');
  const eventYear=notes.match(/\b(19\d{2}|20\d{2})\s+(?:summer\s+|winter\s+)?olympics\b/i);
- if(eventYear&&!new RegExp('\\b'+eventYear[1]+'\\b').test(title))errors.push('Seller-described Olympics year '+eventYear[1]+' is missing from the title.');
+ if(eventYear&&!new RegExp('\\b'+eventYear[1]+'\\b').test(copy))errors.push('Seller-described Olympics year '+eventYear[1]+' is missing from the listing.');
  const numberedGraphic=notes.match(/\b(?:number|#)\s*(\d{1,3})\b/i);
- if(numberedGraphic&&!new RegExp('\\b'+numberedGraphic[1]+'\\b').test(title))errors.push('Seller-described graphic number '+numberedGraphic[1]+' is missing from the title.');
+ if(numberedGraphic&&!new RegExp('\\b'+numberedGraphic[1]+'\\b').test(copy))errors.push('Seller-described graphic number '+numberedGraphic[1]+' is missing from the listing.');
  if(/\b(?:insanely|super|very)?\s*soft\b/i.test(notes)&&!/\bsoft\b/i.test(body))errors.push('Seller-described soft feel is missing from the sales description.');
  if(/\bstains?\b/i.test(notes)&&!/\bstains?\b/i.test(body))errors.push('Documented stains must be disclosed in the sales description.');
  if(/\b(?:sun\s?faded?|sunfade|fading)\b/i.test(notes)&&!/\b(?:sun\s?faded?|sunfade|fading)\b/i.test(body))errors.push('Seller-described fading is missing from the sales description.');

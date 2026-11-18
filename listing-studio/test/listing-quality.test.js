@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {resolveBrand,listingSchema,LISTING_STANDARD} from '../src/listing-quality.js';
-import {exportAttributes,listingRow,validate,importItem,description,dropdownChoices,inventoryEra,exportCSV,SWEATSHIRT_CATEGORY,sellerFactErrors,reviewDraft} from '../public/core.js';
+import {exportAttributes,listingRow,validate,importItem,description,dropdownChoices,inventoryEra,exportCSV,SWEATSHIRT_CATEGORY,sellerFactErrors,reviewDraft,completeGeneratedTitle,previewSellerTitle,sellerTitleFacts} from '../public/core.js';
 import worker from '../src/worker.js';
 const tax=JSON.parse(await readFile(new URL('../public/taxonomy.json',import.meta.url)));
 test('A maker outside the prompt shortlist resolves against the complete template',()=>{
@@ -32,10 +32,11 @@ test('Duplicate hashtags and invalid optional attributes cannot pass review vali
  const i=item();i.analysis.hashtags=['red','red','crewneck','graphic','retro'];i.analysis.style3='irrelevant';
  assert.ok(validate(i,tax).includes('Use five distinct hashtags'));assert.ok(validate(i,tax).includes('Select valid style3'));
 });
-async function replace({failed=false,exported=false}={}){
+async function replace({failed=false,exported=false,sourceName,generatedTitle}={}){
  const old=item();old.approved=true;old.status=exported?'exported':'approved';old.photos=[{key:'AJ1060/'+'a'.repeat(64)+'.jpg',url:'https://studio.example/photo.jpg'}];
+ if(sourceName)old.source['Item Name']=sourceName;
  let saved,calls=0;const original=globalThis.fetch;
- globalThis.fetch=async()=>{calls++;return failed?Response.json({error:'unavailable'},{status:429}):Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({...old.analysis,brand:'Russell Athletic',evidence:[{fact:'Red graphic sweatshirt',support:'Inventory Item Name'}],searchPhrases:['Rah Rah sweatshirt','red graphic crewneck']})}]}]});};
+ globalThis.fetch=async()=>{calls++;return failed?Response.json({error:'unavailable'},{status:429}):Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify({...old.analysis,title:generatedTitle||old.analysis.title,brand:'Russell Athletic',evidence:[{fact:'Red graphic sweatshirt',support:'Inventory Item Name'}],searchPhrases:['Rah Rah sweatshirt','red graphic crewneck']})}]}]});};
  const env={ADMIN_TOKEN:'test',OPENAI_API_KEY:'fake',OPENAI_MODEL:'configured',ASSETS:{fetch:async()=>Response.json(tax)},PHOTOS:{head:async()=>({})},DB:{prepare:sql=>({bind:(...args)=>({first:async()=>({data:JSON.stringify(old)}),run:async()=>{if(sql.startsWith('UPDATE items'))saved=JSON.parse(args[0]);return {meta:{changes:1}};}})})}};
  try{const response=await worker.fetch(new Request('https://studio.example/api/analyze',{method:'POST',headers:{Authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify({sku:'AJ1060',replace:true})}),env);return {response,saved,calls,old};}finally{globalThis.fetch=original;}
 }
@@ -50,6 +51,32 @@ test('Failed paid replacement retains the saved approved listing',async()=>{
 });
 test('Exported listing replacement is blocked before any paid API call',async()=>{
  const r=await replace({exported:true});assert.equal(r.response.status,409);assert.equal(r.saved,undefined);assert.equal(r.calls,0);
+});
+
+test('One paid replacement keeps seller vintage and 1995 in the saved customer title',async()=>{
+ const r=await replace({sourceName:'Vintage deep purple Harley Davidson crewneck 1995',generatedTitle:'Harley Davidson Purple Crewneck Sweatshirt'});
+ assert.equal(r.calls,1);assert.equal(r.saved.analysis.title,'Vintage 1995 Harley Davidson Purple Crewneck Sweatshirt');
+ assert.ok(r.saved.description.startsWith(r.saved.analysis.title+'\n\n'));
+ assert.ok(!r.saved.flags.some(f=>/vintage status|year 1995/.test(f)));
+});
+test('Title repair uses only seller supplied facts and is idempotent',()=>{
+ const source={'Item Name':'Vintage deep purple Harley Davidson crewneck 1995'};
+ assert.deepEqual(sellerTitleFacts(source),{vintage:true,datedVintage:'',year:'1995'});
+ const title=completeGeneratedTitle('Harley Davidson Purple Crewneck Sweatshirt',source);
+ assert.equal(completeGeneratedTitle(title,source),title);
+ assert.equal(completeGeneratedTitle('Harley Davidson Purple Crewneck Sweatshirt',{'Item Name':'Purple Harley Davidson crewneck'}),'Harley Davidson Purple Crewneck Sweatshirt');
+ assert.equal(completeGeneratedTitle('Rah Rah 20 Red Graphic Crewneck Sweatshirt',{'Item Name':'Vintage 1985 Rah Rah crewneck'}),'Vintage 1985 Rah Rah 20 Red Graphic Crewneck Sweatshirt');
+});
+test('An earlier cached draft is repaired in review without another model call or a manual title edit',()=>{
+ const old=item();old.source['Item Name']='Vintage purple Harley Davidson crewneck 1995';
+ old.analysis.title='Harley Davidson Purple Crewneck Sweatshirt';old.description=description(old);
+ old.flags=['Seller-described vintage status is missing from the title.','Seller-described year 1995 is missing from the title.'];
+ assert.ok(validate(old,tax).some(e=>e.includes('vintage status')));
+ const shown=previewSellerTitle(old);
+ assert.equal(shown.analysis.title,'Vintage 1995 Harley Davidson Purple Crewneck Sweatshirt');
+ assert.ok(shown.description.startsWith(shown.analysis.title+'\n\n'));
+ assert.ok(!validate(shown,tax).some(e=>/vintage status|year 1995/.test(e)));
+ assert.equal(old.analysis.title,'Harley Davidson Purple Crewneck Sweatshirt');
 });
 
 test('Size line uses the supplied size without exporting internal verification caveats',()=>{const i=item();i.analysis.tagMissing=false;i.analysis.sizeVerified=false;assert.match(description(i),/Size: S\n\nShipping/);i.analysis.sizeVerified=true;assert.match(description(i),/Tagged size: S/);i.analysis.tagMissing=true;assert.match(description(i),/Size: S\n\nShipping/);});
@@ -130,6 +157,8 @@ test('Event year and contrasting cuffs survive beyond the Rah Rah regression cas
 test('Seller years outside a Vintage YYYY phrase are retained without guessing a manufacturing date',()=>{
  const i=item();i.source['Item Name']='Vintage deep purple Harley Davidson crewneck 1995';
  assert.ok(sellerFactErrors(i).some(e=>e.includes('year 1995')));
+ i.analysis.body+=' Year 1995 is printed on the graphic.';i.description=description(i);
+ assert.ok(!sellerFactErrors(i).some(e=>e.includes('year 1995')));
  i.analysis.title='Vintage 1995 Harley Davidson Purple Crewneck Sweatshirt';i.description=description(i);
  assert.deepEqual(sellerFactErrors(i),[]);
 });
