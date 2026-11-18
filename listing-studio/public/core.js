@@ -66,7 +66,7 @@ export function sellerFactErrors(item){
  const numberedGraphic=notes.match(/\b(?:number|#)\s*(\d{1,3})\b/i);
  if(numberedGraphic&&!new RegExp('\\b'+numberedGraphic[1]+'\\b').test(copy))errors.push('Seller-described graphic number '+numberedGraphic[1]+' is missing from the listing.');
  if(/\b(?:insanely|super|very)?\s*soft\b/i.test(notes)&&!/\bsoft\b/i.test(body))errors.push('Seller-described soft feel is missing from the sales description.');
- if(/\bstains?\b/i.test(notes)&&!/\bstains?\b/i.test(body))errors.push('Documented stains must be disclosed in the sales description.');
+ if(/\bstain(?:s|ed|ing)?\b/i.test(notes)&&!/\bstain(?:s|ed|ing)?\b/i.test(body))errors.push('Documented stains must be disclosed in the sales description.');
  if(/\b(?:sun\s?faded?|sunfade|fading)\b/i.test(notes)&&!/\b(?:sun\s?faded?|sunfade|fading)\b/i.test(body))errors.push('Seller-described fading is missing from the sales description.');
  if(/\b(?:graphic\s+cracking|cracked\s+graphic)\b/i.test(notes)&&!/\b(?:crack(?:ing|ed|s)?)\b/i.test(body))errors.push('Documented graphic cracking must be disclosed in the sales description.');
  if(/\b(?:no tag|tag removed|missing tag)\b/i.test(notes)&&!/\b(?:(?:no|missing|removed)\s+(?:original\s+)?tag|tag\s+(?:is\s+)?(?:missing|removed))\b/i.test(body))errors.push('Seller-reported missing tag must be disclosed in the sales description.');

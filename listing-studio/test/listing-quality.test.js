@@ -168,6 +168,8 @@ test('Documented flaws and missing tag cannot disappear from customer copy',()=>
  for(const phrase of ['stains','fading','cracking','missing tag'])assert.ok(errors.some(e=>e.includes(phrase)),phrase);
  i.analysis.body+=' There are minor stains, sun fading and cracking in the graphic. No original tag remains.';
  i.description=description(i);assert.deepEqual(sellerFactErrors(i),[]);
+ i.analysis.body=i.analysis.body.replace('minor stains','minor staining');i.description=description(i);
+ assert.deepEqual(sellerFactErrors(i),[],'staining discloses a documented stain');
 });
 test('Optional styles can remain blank instead of adding unrelated search terms',()=>{
  const i=item();i.analysis.style1='';i.analysis.style2='';i.analysis.style3='';i.analysis.color2='';
