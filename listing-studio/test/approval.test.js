@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {reviewDraft,coverDraft,nextReviewSKU,nextBatchSKU,setBatchStatus,restoreBatchStatus,excludedFromBatch} from '../public/core.js';
 const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
-const start=app.indexOf(' const save=async('),end=app.indexOf(";$('save').onclick",start);
+const start=app.indexOf(' const save=async('),end=app.indexOf(";$('saveNext').onclick",start);
 const coverStart=app.indexOf('async function chooseCover('),coverEnd=app.indexOf('\nfunction review(){',coverStart);
 function setup({errors=[],fail=false,others=[],selection,item:existingItem}={}){
  const item=existingItem?structuredClone(existingItem):{sku:'AJ1028',analysis:{title:'Honda Racing Black Crewneck Sweatshirt',size:'S'},description:'Honda Racing Black Crewneck Sweatshirt\n\nReviewed item details.',price:'56.25',condition:'good',photos:[{name:'front.jpg',url:'https://studio.example/front.jpg'},{name:'back.jpg',url:'https://studio.example/back.jpg'}],approved:false,status:'review',error:'old analysis error'};

@@ -3,11 +3,14 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import worker from '../src/worker.js';
+import {session} from '../src/auth.js';
 import * as core from '../public/core.js';
 const html=await readFile(new URL('../public/index.html',import.meta.url),'utf8');
 const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');
 const tax=JSON.parse(await readFile(new URL('../public/taxonomy.json',import.meta.url)));
-function fixture(){
+tax.brands=['Other (unbranded)'];tax.categories=[core.SWEATSHIRT_CATEGORY];
+function fixture({cookieAuth=false}={}){
+ let cookie;
  const records=new Map();let writes=0,failNext=false,releaseSave;
  for(const sku of ['AJ1028','AJ1029','AJ1030']){
   const item=core.importItem({SKU:sku,'Item Name':'Mickey Mouse red crewneck, no tag, soft feel',RRP:'35',Condition:'A'});
@@ -18,14 +21,18 @@ function fixture(){
   all:async()=>({results:[...records.values()].map(item=>({data:JSON.stringify(item)}))}),
   bind(...args){return {run:async()=>{if(failNext){failNext=false;throw Error('Simulated database outage');}if(releaseSave)await releaseSave;writes++;records.set(args[0],JSON.parse(args[1]));return {success:true};}};}
  };}},ASSETS:{fetch:async()=>Response.json(tax)}};
- return {records,get writes(){return writes;},fail(){failNext=true;},delay(){let release;releaseSave=new Promise(r=>release=r);return ()=>{releaseSave=undefined;release();};},async open(storage){
+ return {records,async expire(){cookie='aj_session='+await session('test',Date.now()-5*60*60*1000);},get writes(){return writes;},fail(){failNext=true;},delay(){let release;releaseSave=new Promise(r=>release=r);return ()=>{releaseSave=undefined;release();};},async open(storage){
+  if(cookieAuth&&!cookie)cookie='aj_session='+await session('test');
   const dom=new JSDOM(html.replace(/<script[^>]*>.*?<\/script>/gs,''),{url:'https://studio.example/',runScripts:'outside-only'}),w=dom.window;
   Object.assign(w,{structuredClone,Blob,fetch:async(path,options={})=>{
    if(path==='taxonomy.json')return Response.json(tax);
-   const headers={...options.headers,Authorization:'Bearer test'};
-   return worker.fetch(new Request(new URL(path,w.location.href),{...options,headers}),env);
+   const headers={...options.headers,...(cookieAuth?{Cookie:cookie}:{Authorization:'Bearer test'})};
+   const response=await worker.fetch(new Request(new URL(path,w.location.href),{...options,headers}),env);
+   if(response.headers.has('Set-Cookie'))cookie=response.headers.get('Set-Cookie').split(';')[0];
+   return response;
   }});
   w.HTMLElement.prototype.scrollIntoView=function(){};
+  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
   let downloaded;w.URL.createObjectURL=blob=>{downloaded=blob;return 'blob:test';};w.URL.revokeObjectURL=()=>{};w.HTMLAnchorElement.prototype.click=function(){};
   w.core=core;if(storage)w.localStorage.setItem('atlantajake-review-session-v1',storage);
   // Execute the complete shipped app module with its real exports, DOM events and Worker API.
@@ -61,4 +68,13 @@ test('Complete DOM save-and-next preserves a draft, and approve advances to an u
  assert.equal(f.records.get('AJ1028').approved,false);assert.match(f.records.get('AJ1028').description,/Edited/);assert.equal(sku(p),'AJ1029');
  await p.$('approve').onclick();assert.equal(sku(p),'AJ1030');assert.ok(p.$('next'));assert.ok(p.$('markSold'));assert.equal(p.$('approve'),null);
  p.dom.window.close();
+});
+
+test('Expired cookie prompts sign-in and retries the exact approval without losing edits',async()=>{
+ const f=fixture({cookieAuth:true}),p=await f.open();select(p);assert.equal(p.$('save'),null);edit(p,'price','77.50');await f.expire();
+ const saving=p.$('approve').onclick();await settle();assert.equal(p.$('sessionDialog').open,true,p.$('reviewFeedback').textContent);assert.equal(f.writes,0);assert.equal(sku(p),'AJ1028');
+ p.$('sessionPassword').value='wrong';await p.$('sessionForm').onsubmit(new p.w.Event('submit'));assert.match(p.$('sessionMessage').textContent,/Incorrect/);assert.equal(f.writes,0);
+ p.$('sessionPassword').value='test';await p.$('sessionForm').onsubmit(new p.w.Event('submit'));await saving;
+ assert.equal(f.records.get('AJ1028').price,'77.50');assert.equal(f.records.get('AJ1028').approved,true);assert.equal(f.writes,1);assert.equal(sku(p),'AJ1029');assert.equal(p.$('sessionPassword').value,'');
+ await f.expire();const cancelled=p.$('approve').onclick();await settle();p.$('sessionCancel').click();await cancelled;assert.equal(sku(p),'AJ1029');assert.equal(f.writes,1);assert.equal(p.$('approve').disabled,false);p.dom.window.close();
 });
