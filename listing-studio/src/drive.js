@@ -22,8 +22,13 @@ export async function driveToken(env){
 }
 export async function driveRequest(env,path,params={}){
  const url=new URL('https://www.googleapis.com/drive/v3/'+path);for(const[k,v]of Object.entries(params))url.searchParams.set(k,v);
- const response=await fetch(url,{headers:{Authorization:'Bearer '+await driveToken(env)}});
- if(!response.ok)throw Error('Drive request failed ('+response.status+'). Confirm the folder is shared with the studio service account.');return response;
+ const token=await driveToken(env);
+ for(let attempt=0;attempt<3;attempt++){
+  const response=await fetch(url,{headers:{Authorization:'Bearer '+token}});
+  if(response.ok)return response;
+  if([429,502,503,504].includes(response.status)&&attempt<2){await new Promise(resolve=>setTimeout(resolve,250*(attempt+1)));continue;}
+  throw Error('Drive request failed ('+response.status+'). Confirm the folder is shared with the studio service account.');
+ }
 }
 export async function driveMeta(env,id){return(await driveRequest(env,'files/'+requireID(id),{fields:'id,name,mimeType,parents,trashed,size,modifiedTime,md5Checksum',supportsAllDrives:'true'})).json();}
 export async function childFiles(env,parent){requireID(parent);const files=[];let pageToken='';do{const result=await(await driveRequest(env,'files',{q:`'${parent}' in parents and trashed = false`,pageSize:'1000',fields:'nextPageToken,files(id,name,mimeType,parents,size,modifiedTime,md5Checksum)',supportsAllDrives:'true',includeItemsFromAllDrives:'true',...(pageToken?{pageToken}:{})})).json();files.push(...result.files);pageToken=result.nextPageToken||'';if(files.length>10000)throw Error('Folder exceeds the pilot scan limit.');}while(pageToken);return files;}
@@ -42,7 +47,8 @@ export async function photoResponse(req,env,sku,id,sig){
  const expected=await signature(env,sku,id);let difference=0;for(let j=0;j<64;j++)difference|=sig.charCodeAt(j)^expected.charCodeAt(j);if(difference)return new Response('Not found',{status:404});
  // Recheck folder membership on every request; a moved or trashed original stops delivery.
  const file=await driveMeta(env,id);const folderId=file.parents?.[0];if(!folderId||file.trashed)return new Response('Not found',{status:404});
- await verifyPhoto(env,sku,{fileId:id,folderId});
+ const folder=await confirmFolder(env,sku,folderId);
+ if(!file.parents.includes(folder.id)||!['image/jpeg','image/png','image/webp'].includes(file.mimeType))return new Response('Not found',{status:404});
  const headers={'Content-Type':file.mimeType,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','X-Robots-Tag':'noindex,nofollow','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, HEAD, OPTIONS','Access-Control-Expose-Headers':'Content-Length, Content-Type','Content-Disposition':'inline; filename="'+sku+'-'+id+'.'+extension(file.mimeType)+'"'};
  if(file.size&&/^\d+$/.test(String(file.size)))headers['Content-Length']=String(file.size);
  if(req.method==='OPTIONS'){delete headers['Content-Length'];return new Response(null,{status:204,headers});}

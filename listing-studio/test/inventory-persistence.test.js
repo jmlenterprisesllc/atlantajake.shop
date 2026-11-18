@@ -58,3 +58,10 @@ test('Browser import sends large sheets in saved chunks and can resume with the 
  await load(csv);assert.deepEqual(calls.map(batch=>batch.length),[100,100,5]);assert.equal(items.size,205);
  assert.match(message,/load automatically next time/);assert.equal(controls.inventory.disabled,false);
 });
+test('Selecting a range reports missing inventory rows instead of silently stopping',async()=>{
+ const app=await readFile(new URL('../public/app.js',import.meta.url),'utf8');const start=app.indexOf("$('selectRange').onclick="),end=app.indexOf('\nlet exportURL',start);
+ const controls={from:{value:'AJ1028'},to:{value:'AJ1074'},selectRange:{}},items=new Map();for(let n=1028;n<=1061;n++)items.set('AJ'+n,{sku:'AJ'+n,status:n===1061?'sold':'review'});
+ let message='';const selected=new Set();const context=vm.createContext({$:id=>controls[id],items,selected,excludedFromBatch:i=>i.status==='sold',render:()=>{},notice:text=>{message=text;}});
+ vm.runInContext(app.slice(start,end),context);controls.selectRange.onclick();
+ assert.equal(selected.size,33);assert.match(message,/13 SKUs in this range are missing/);assert.match(message,/AJ1062/);assert.match(message,/Upload the current master inventory CSV/);
+});
